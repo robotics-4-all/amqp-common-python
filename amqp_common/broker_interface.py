@@ -5,6 +5,7 @@ from __future__ import absolute_import
 
 import pika
 import ssl
+import sys
 from .r4a_logger import create_logger
 
 
@@ -42,10 +43,16 @@ class BrokerInterfaceSync:
     DEFAULT_VIRTUAL_HOST = '/'
     DEFAULT_HOST = '127.0.0.1'
     DEFAULT_CREDENTIALS = Credentials()
-    DEFAULT_SSL_OPTIONS = dict(
-        ssl_version=ssl.PROTOCOL_TLSv1_2,
-        cert_reqs=ssl.CERT_OPTIONAL,
-    )
+
+    if sys.version_info >= (3, 0):
+        DEFAULT_SSL_OPTIONS = ssl.create_default_context()
+        DEFAULT_SSL_OPTIONS.check_hostname = False
+        DEFAULT_SSL_OPTIONS.verify_mode = ssl.CERT_NONE
+    else:
+        DEFAULT_SSL_OPTIONS = dict(
+            ssl_version=ssl.PROTOCOL_TLSv1_2,
+            cert_reqs=ssl.CERT_OPTIONAL,
+        )
 
     def __init__(self, *args, **kwargs):
         """
