@@ -44,14 +44,18 @@ class BrokerInterfaceSync:
     DEFAULT_HOST = '127.0.0.1'
     DEFAULT_CREDENTIALS = Credentials()
 
+    """
     if sys.version_info >= (3, 0):
         DEFAULT_SSL_OPTIONS = ssl.create_default_context()
         DEFAULT_SSL_OPTIONS.check_hostname = False
         DEFAULT_SSL_OPTIONS.verify_mode = ssl.CERT_NONE
     else:
         DEFAULT_SSL_OPTIONS = dict(
-            cert_reqs=ssl.CERT_OPTIONAL
+            ssl_version=ssl.PROTOCOL_TLSv1_2,
+            cert_reqs=ssl.CERT_OPTIONAL,
         )
+    """
+    DEFAULT_SSL_OPTIONS = None
 
     def __init__(self, *args, **kwargs):
         """
