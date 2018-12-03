@@ -50,8 +50,7 @@ class BrokerInterfaceSync:
         DEFAULT_SSL_OPTIONS.verify_mode = ssl.CERT_NONE
     else:
         DEFAULT_SSL_OPTIONS = dict(
-            ssl_version=ssl.PROTOCOL_TLSv1_2,
-            cert_reqs=ssl.CERT_OPTIONAL,
+            cert_reqs=ssl.CERT_OPTIONAL
         )
 
     def __init__(self, *args, **kwargs):
