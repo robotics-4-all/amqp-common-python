@@ -17,7 +17,7 @@ def read(fname):
 
 setup(
     install_requires=[
-        'pika'
+        'pika==0.12'
     ],
     name='amqp_common',
     version='0.6.0',
