@@ -17,7 +17,8 @@ if __name__ == '__main__':
     }
 
     pub = amqp_common.PublisherSync(
-        topic, host='155.207.33.185', port='5672',
+        topic, connection_params=amqp_common.ConnectionParameters(
+            host='155.207.33.185', port='5672'),
         creds=amqp_common.Credentials('robot_1', 'r0b0t1'))
 
     pub.pub_loop(data, rate)

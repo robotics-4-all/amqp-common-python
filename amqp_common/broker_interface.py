@@ -9,6 +9,34 @@ import sys
 from .r4a_logger import create_logger
 
 
+class ConnectionParameters(object):
+    """AMQP Connection parameters."""
+
+    def __init__(self, host='127.0.0.1', port='5672',
+                 secure=False, vhost='/',
+                 reconnect_attempts=5,
+                 retry_delay=2.0,
+                 timeout=20.0):
+        """Constructor
+
+        @param host: Hostname of AMQP broker
+        @type host: string
+
+        @param port: AMQP broker listening port
+        @type port: string
+
+        @param secure: Enable SSL/TLS - AMQPS
+        @type secure: boolean
+        """
+        self.host = host
+        self.port = port
+        self.secure = secure
+        self.vhost = vhost
+        self.reconnect_attempts = reconnect_attempts
+        self.retry_delay = retry_delay
+        self.timeout = timeout
+
+
 class ExchangeTypes(object):
     Topic = 'topic'
     Direct = 'direct'
@@ -34,28 +62,6 @@ class Credentials(object):
 
 class BrokerInterfaceSync:
     DEFAULT_TOPIC_EXCHANGE = 'amq.topic'
-    DEFAULT_TIMEOUT = 20.0
-    DEFAULT_RETRY_DELAY = 2.0
-    DEFAULT_RECONNECT_ATTEMPTS = 5
-    DEFAULT_PORT = 5672
-    DEFAULT_SSL_PORT = 5671
-    DEFAULT_SSL = False
-    DEFAULT_VIRTUAL_HOST = '/'
-    DEFAULT_HOST = '127.0.0.1'
-    DEFAULT_CREDENTIALS = Credentials()
-
-    """
-    if sys.version_info >= (3, 0):
-        DEFAULT_SSL_OPTIONS = ssl.create_default_context()
-        DEFAULT_SSL_OPTIONS.check_hostname = False
-        DEFAULT_SSL_OPTIONS.verify_mode = ssl.CERT_NONE
-    else:
-        DEFAULT_SSL_OPTIONS = dict(
-            ssl_version=ssl.PROTOCOL_TLSv1_2,
-            cert_reqs=ssl.CERT_OPTIONAL,
-        )
-    """
-    DEFAULT_SSL_OPTIONS = None
 
     def __init__(self, *args, **kwargs):
         """
@@ -66,74 +72,56 @@ class BrokerInterfaceSync:
         self._closing = False
         self.logger = create_logger(self.__class__.__name__)
 
-        self._host = self.DEFAULT_HOST
-        if 'host' in kwargs:
-            self._host = kwargs.pop('host')
-
-        self._port = self.DEFAULT_PORT
-        if 'port' in kwargs:
-            self._port = kwargs.pop('port')
-
-        self._credentials = self.DEFAULT_CREDENTIALS
         if 'creds' in kwargs:
-            self._credentials = kwargs.pop('creds')
+            self.credentials = kwargs.pop('creds')
+        else:
+            self.credentials = Credentials()
 
-        self._reconnect_attempts = self.DEFAULT_RECONNECT_ATTEMPTS
-        if 'reconnect_attempts' in kwargs:
-            self._reconnect_attempts = kwargs.pop('reconnect_attempts')
+        if 'connection_params' in kwargs:
+            self.connection_params = kwargs.pop('connection_params')
+        else:
+            # Default Connection Parameters
+            self.connection_params = ConnectionParameters()
 
-        self._topic_exchange = self.DEFAULT_TOPIC_EXCHANGE
-        if 'topic_exchange' in kwargs:
-            self._topic_exchange = kwargs.pop('topic_exchange')
+        if 'connection' in kwargs:
+            self._connection = kwargs.pop('connection')
 
-        self._ssl = self.DEFAULT_SSL
-        if 'ssl' in kwargs:
-            self._ssl = kwargs.pop('ssl')
-
-        self._ssl_port = self.DEFAULT_SSL_PORT
-        if 'ssl_port' in kwargs:
-            self._ssl_port = kwargs.pop('ssl_port')
-
-        self._retry_delay = self.DEFAULT_RETRY_DELAY
-        if 'retry_delay' in kwargs:
-            self._retry_delay = kwargs.pop('retry_delay')
-
-        self._timeout = self.DEFAULT_TIMEOUT
-        if 'timeout' in kwargs:
-            self._timeout = kwargs.pop('timeout')
-
-        self._ssl_options = self.DEFAULT_SSL_OPTIONS
-        if 'ssl_options' in kwargs:
-            self._ssl_options = kwargs.pop('ssl_options')
-
-        if self._ssl:
-            self._port = self._ssl_port
-
-        self._creds_pika = pika.PlainCredentials(self._credentials.username,
-                                                 self._credentials.password)
+        self._creds_pika = pika.PlainCredentials(self.credentials.username,
+                                                 self.credentials.password)
 
     def connect(self):
         """
         Connect to the AMQP broker.
         """
+        host = self.connection_params.host
+        port = self.connection_params.port
+        vhost = self.connection_params.vhost
+        reconnect_attempts = self.connection_params.reconnect_attempts
+        timeout = self.connection_params.timeout
+        retry_delay = self.connection_params.retry_delay
+        secure = self.connection_params.secure
+
         self._connect_params = pika.ConnectionParameters(
-            host=self._host, port=self._port,
+            host=host, port=port,
             credentials=self._creds_pika,
-            connection_attempts=self._reconnect_attempts,
-            retry_delay=self._retry_delay,
-            blocked_connection_timeout=self._timeout,
-            socket_timeout=self._timeout
+            connection_attempts=reconnect_attempts,
+            retry_delay=retry_delay,
+            blocked_connection_timeout=timeout,
+            socket_timeout=timeout
         )
 
         try:
-            self._connection = pika.BlockingConnection(self._connect_params)
+            if self._connection is None:
+                # Create a new connection
+                self._connection = pika.BlockingConnection(
+                    self._connect_params)
             self._channel = self._connection.channel()
         except Exception as exc:
             self.logger.exception('')
             raise exc
             return False
-        self.logger.info("Connected to AMQP broker @ [{}:{}]".format(
-            self._host, self._port))
+        self.logger.info('Connected to AMQP broker @ [{}:{}]'.format(
+            host, port))
         return True
 
     def setup_exchange(self, exchange_name, exchange_type):
@@ -167,7 +155,7 @@ class BrokerInterfaceSync:
                                              durable=False,
                                              auto_delete=True)
         queue_name = result.method.queue
-        self.logger.info("Created queue [{}]".format(queue_name))
+        self.logger.info('Created queue [{}]'.format(queue_name))
         return queue_name
 
     def bind_queue(self, exchange_name, queue_name, bind_key):

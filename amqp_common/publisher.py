@@ -11,7 +11,7 @@ from .rate import Rate
 
 class PublisherSync(BrokerInterfaceSync):
 
-    def __init__(self, topic, *args, **kwargs):
+    def __init__(self, topic, exchange='amq.topic', *args, **kwargs):
         """
         Constructor.
 
@@ -20,12 +20,13 @@ class PublisherSync(BrokerInterfaceSync):
 
         """
         BrokerInterfaceSync.__init__(self, *args, **kwargs)
+        self._topic_exchange = exchange
+        self._topic = topic
         self.connect()
         self.setup_exchange(self._topic_exchange, ExchangeTypes.Topic)
-        self._topic = topic
 
     def publish(self, msg):
-        self.logger.debug("[x] - Sent %r:%r" % (self._topic, msg))
+        self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
         self._channel.basic_publish(exchange=self._topic_exchange,
                                     routing_key=self._topic,
                                     body=self._serialize_data(msg))

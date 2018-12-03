@@ -11,15 +11,20 @@ from .broker_interface import BrokerInterfaceSync, Credentials, ExchangeTypes
 
 class SubscriberSync(BrokerInterfaceSync):
 
-    def __init__(self, topic, *args, **kwargs):
+    def __init__(self, topic, on_message=None, exchange='amq.topic',
+                 *args, **kwargs):
         """
         TODO!!
+
+        @param connection_params: AMQP Connection Parameters
+        @type connection_params: ConnectionParameters
         """
         BrokerInterfaceSync.__init__(self, *args, **kwargs)
         self._topic = topic
+        self._topic_exchange = exchange
         self._queue_name = None
         self.connect()
-        self.on_msg_callback = kwargs.pop('callback')
+        self.on_msg_callback = on_message
         self.setup_exchange(self._topic_exchange, ExchangeTypes.Topic)
         # Create a queue
         self._queue_name = self.create_queue()
