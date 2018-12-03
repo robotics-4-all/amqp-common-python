@@ -4,6 +4,7 @@
 from __future__ import absolute_import
 
 import json
+from threading import Thread
 
 from .broker_interface import BrokerInterfaceSync, Credentials, ExchangeTypes
 
@@ -34,6 +35,11 @@ class SubscriberSync(BrokerInterfaceSync):
             self._callback = callback
         # Start loop
         self._consume()
+
+    def run_threaded(self):
+        self.loop_thread = Thread(target=self.run)
+        self.loop_thread.daemon = True
+        self.loop_thread.start()
 
     def _consume(self):
         """
