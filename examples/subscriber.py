@@ -4,6 +4,8 @@
 from __future__ import print_function
 
 import sys
+import time
+
 import amqp_common
 
 
@@ -16,14 +18,17 @@ def callback(msg, meta):
     print('[*] - Properties={}'.format(props))
     print('[*] - Data={}'.format(msg))
 
-if __name__ == "__main__":
-    topic = sys.argv[1] if len(sys.argv) > 1 else 'anonymous.info'
-    try:
-        sub = amqp_common.SubscriberSync(
-            topic, callback=callback,
-            creds=amqp_common.Credentials('invalid', 'invalid'))
-    except Exception:
-        sub = amqp_common.SubscriberSync(
-            topic, callback=callback,
-            creds=amqp_common.Credentials('guest', 'guest'))
-    sub.run()
+
+if __name__ == '__main__':
+    topic = sys.argv[1] if len(sys.argv) > 1 else 'robot_1.dummy'
+    sub = amqp_common.SubscriberSync(
+        topic, callback=callback,
+        host='155.207.33.185',
+        port='5672',
+        creds=amqp_common.Credentials('robot_1', 'r0b0t1'))
+    sub.run_threaded()
+    while True:
+        try:
+            time.sleep(0.01)
+        except KeyboardInterrupt:
+            break
