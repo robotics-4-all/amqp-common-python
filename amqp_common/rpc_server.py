@@ -6,6 +6,7 @@ from __future__ import absolute_import
 import pika
 import json
 from .broker_interface import BrokerInterfaceSync
+from threading import Thread
 
 
 class RpcServer(BrokerInterfaceSync):
@@ -32,6 +33,11 @@ class RpcServer(BrokerInterfaceSync):
                                     queue=self._rpc_queue)
         self.logger.info("[x] - Awaiting RPC requests")
         self._channel.start_consuming()
+
+    def run_threaded(self):
+        self.loop_thread = Thread(target=self.run)
+        self.loop_thread.daemon = True
+        self.loop_thread.start()
 
     def _on_request_wrapper(self, ch, method, properties, body):
         try:
