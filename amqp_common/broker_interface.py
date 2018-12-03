@@ -39,7 +39,7 @@ class BrokerInterfaceSync:
     DEFAULT_RECONNECT_ATTEMPTS = 5
     DEFAULT_PORT = 5672
     DEFAULT_SSL_PORT = 5671
-    DEFAULT_SSL = True
+    DEFAULT_SSL = False
     DEFAULT_VIRTUAL_HOST = '/'
     DEFAULT_HOST = '127.0.0.1'
     DEFAULT_CREDENTIALS = Credentials()
@@ -119,9 +119,7 @@ class BrokerInterfaceSync:
             connection_attempts=self._reconnect_attempts,
             retry_delay=self._retry_delay,
             blocked_connection_timeout=self._timeout,
-            socket_timeout=self._timeout,
-            ssl=self._ssl,
-            ssl_options=pika.SSLOptions(self._ssl_options)
+            socket_timeout=self._timeout
         )
 
         try:

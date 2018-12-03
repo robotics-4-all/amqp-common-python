@@ -7,7 +7,7 @@ import sys
 import amqp_common
 
 
-def callback(ch, method, props, msg):
+def callback(msg, meta):
     print(msg)
     a = msg['a']
     b = msg['b']
@@ -17,5 +17,5 @@ def callback(ch, method, props, msg):
 
 if __name__ == "__main__":
     rpc_name = sys.argv[1] if len(sys.argv) > 1 else 'rpc_mult'
-    rpc_server = amqp_common.RpcServer(rpc_name)
-    rpc_server.run(callback)
+    rpc_server = amqp_common.RpcServer(rpc_name, on_request=callback)
+    rpc_server.run()
