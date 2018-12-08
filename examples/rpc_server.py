@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
@@ -16,7 +16,7 @@ def callback(msg, meta):
 
 
 if __name__ == "__main__":
-    rpc_name = sys.argv[1] if len(sys.argv) > 1 else 'rpc_mult'
+    rpc_name = sys.argv[1] if len(sys.argv) > 1 else 'rpc.mult'
     creds = amqp_common.Credentials(username='robot_1', password='r0b0t1')
     conn_params = amqp_common.ConnectionParameters(host='155.207.33.185',
                                                    port='5672')
