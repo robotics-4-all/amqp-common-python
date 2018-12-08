@@ -47,17 +47,3 @@ class PublisherSync(BrokerInterfaceSync):
             classes.
         """
         return json.dumps(data)
-
-
-if __name__ == "__main__":
-    import sys
-    topic = sys.argv[1] if len(sys.argv) > 1 else 'anonymous.info'
-    rate = int(sys.argv[2]) if len(sys.argv) > 2 else 10
-    message = ' '.join(sys.argv[3:]) or 'Hello World!'
-
-    try:
-        pub = PublisherSync(topic, creds=Credentials('invalid', 'invalid'))
-    except Exception:
-        pub = PublisherSync(topic, creds=Credentials('guest', 'guest'))
-
-    pub.pub_loop(message, rate)
