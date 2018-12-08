@@ -6,7 +6,7 @@ from __future__ import absolute_import
 import uuid
 import json
 import pika
-from .broker_interface import BrokerInterfaceSync
+from .broker_interface import BrokerInterfaceSync, ExchangeTypes
 
 
 class RpcClient(BrokerInterfaceSync):
@@ -23,21 +23,27 @@ class RpcClient(BrokerInterfaceSync):
         self._rpc_name = rpc_name
         self._corr_id = None
         self._response = None
-        self._exchange = ''  # TODO: pop from kwargs
+        self._exchange = ExchangeTypes.Default
 
-        self._channel.basic_consume(self.on_response,
+        self._channel.basic_consume(self._on_response,
                                     no_ack=True,
                                     queue='amq.rabbitmq.reply-to')
 
-    def on_response(self, ch, method, props, body):
+    def _on_response(self, ch, method, props, body):
+        """Handle on-response event."""
+        self.logger.debug('Received Request:' +
+                          '\n- [*] Method: %s' +
+                          '\n- [*] Properties: %s' +
+                          '\n- [*] Channel: %s', method,
+                          props, ch)
+
         self._response = body
 
     def gen_corr_id(self):
         """Generate correlationID."""
         return str(uuid.uuid4())
 
-    def call(self, msg, background=False, immediate=False,
-             on_response=None, timeout=2.0):
+    def call(self, msg, background=False, immediate=False, timeout=2.0):
         """Call RPC."""
         if not self._validate_data(msg):
             raise TypeError('Should be of type dict')
@@ -69,6 +75,8 @@ class RpcClient(BrokerInterfaceSync):
 
     def _serialize_data(self, data):
         """
+        Serialize data.
+
         TODO: Make Class. Allow different implementation of serialization
             classes.
         """
@@ -102,9 +110,3 @@ class RpcClient(BrokerInterfaceSync):
             return True
         else:
             return False
-
-
-if __name__ == "__main__":
-    rpc_client = RpcClient('rpc_mult')
-    resp = rpc_client.call({'a': 2, 'b': 4})
-    print(resp)

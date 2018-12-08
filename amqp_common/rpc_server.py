@@ -3,10 +3,12 @@
 
 from __future__ import absolute_import
 
-import pika
 import json
-from .broker_interface import BrokerInterfaceSync
 from threading import Thread
+
+import pika
+
+from .broker_interface import BrokerInterfaceSync
 
 
 class RpcServer(BrokerInterfaceSync):
@@ -28,19 +30,24 @@ class RpcServer(BrokerInterfaceSync):
         self._channel.basic_qos(prefetch_count=1)
 
     def run(self):
-        """TODO"""
+        """."""
         self._channel.basic_consume(self._on_request_wrapper,
                                     queue=self._rpc_queue)
         self.logger.info('[x] - Awaiting RPC requests')
         self._channel.start_consuming()
 
     def run_threaded(self):
+        """Run RPC Server in a separate thread."""
         self.loop_thread = Thread(target=self.run)
         self.loop_thread.daemon = True
         self.loop_thread.start()
 
     def _on_request_wrapper(self, ch, method, properties, body):
-        print('[*] Method: %s', method)
+        self.logger.debug('Received Request:' +
+                          '\n- [*] Method: %s' +
+                          '\n- [*] Properties: %s' +
+                          '\n- [*] Channel: %s', method,
+                          properties, ch)
         try:
             msg = self._deserialize_data(body)
             meta = {
