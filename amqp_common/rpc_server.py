@@ -31,7 +31,7 @@ class RpcServer(BrokerInterfaceSync):
         """TODO"""
         self._channel.basic_consume(self._on_request_wrapper,
                                     queue=self._rpc_queue)
-        self.logger.info("[x] - Awaiting RPC requests")
+        self.logger.info('[x] - Awaiting RPC requests')
         self._channel.start_consuming()
 
     def run_threaded(self):
@@ -40,6 +40,7 @@ class RpcServer(BrokerInterfaceSync):
         self.loop_thread.start()
 
     def _on_request_wrapper(self, ch, method, properties, body):
+        print('[*] Method: %s', method)
         try:
             msg = self._deserialize_data(body)
             meta = {
@@ -52,10 +53,11 @@ class RpcServer(BrokerInterfaceSync):
             self.logger.exception('')
             resp = {'error': str(e)}
         resp_serial = self._serialize_data(resp)
+        pub_props = pika.BasicProperties(
+            correlation_id=properties.correlation_id)
         ch.basic_publish(exchange=self._exchange,
                          routing_key=properties.reply_to,
-                         properties=pika.BasicProperties(
-                             correlation_id=properties.correlation_id),
+                         properties=pub_props,
                          body=resp_serial)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -78,16 +80,3 @@ class RpcServer(BrokerInterfaceSync):
         @type data: dict|int|bool
         """
         return json.loads(data)
-
-
-if __name__ == "__main__":
-    def callback(ch, method, props, body):
-        body = json.loads(body)
-        print(body)
-        a = body['a']
-        b = body['b']
-        c = a * b
-        return c
-    rpc_server = RpcServer('rpc_mult')
-
-    rpc_server.run(callback)
