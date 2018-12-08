@@ -43,7 +43,7 @@ class RpcClient(BrokerInterfaceSync):
         """Generate correlationID."""
         return str(uuid.uuid4())
 
-    def call(self, msg, background=False, immediate=False, timeout=2.0):
+    def call(self, msg, background=False, immediate=False, timeout=5.0):
         """Call RPC."""
         if not self._validate_data(msg):
             raise TypeError('Should be of type dict')
