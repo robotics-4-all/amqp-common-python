@@ -4,20 +4,25 @@
 from __future__ import absolute_import
 
 import pika
-import ssl
+#  import ssl
 import sys
+
 from .r4a_logger import create_logger
 
 
 class ConnectionParameters(object):
     """AMQP Connection parameters."""
 
-    def __init__(self, host='127.0.0.1', port='5672',
-                 secure=False, vhost='/',
+    def __init__(self,
+                 host='127.0.0.1',
+                 port='5672',
+                 secure=False,
+                 vhost='/',
                  reconnect_attempts=5,
                  retry_delay=2.0,
                  timeout=20.0):
-        """Constructor
+        """
+        Constructor.
 
         @param host: Hostname of AMQP broker
         @type host: string
@@ -38,12 +43,16 @@ class ConnectionParameters(object):
 
 
 class ExchangeTypes(object):
+    """AMQP Exchange Types."""
+
     Topic = 'topic'
     Direct = 'direct'
     Fanout = 'fanout'
+    Default = ''
 
 
 class Credentials(object):
+    """Connection credentials for authn/authz."""
 
     def __init__(self, username='guest', password='guest'):
         """
@@ -60,13 +69,19 @@ class Credentials(object):
         self.password = password
 
 
-class BrokerInterfaceSync:
-    DEFAULT_TOPIC_EXCHANGE = 'amq.topic'
+class SharedConnection(object):
+    """Shared Connection."""
+
+    def __init__(self):
+        """Constructor."""
+        pass
+
+
+class BrokerInterfaceSync(object):
+    """Broker Interface."""
 
     def __init__(self, *args, **kwargs):
-        """
-        TODO!!
-        """
+        """TODO."""
         self._connection = None
         self._channel = None
         self._closing = False
@@ -90,9 +105,7 @@ class BrokerInterfaceSync:
                                                  self.credentials.password)
 
     def connect(self):
-        """
-        Connect to the AMQP broker.
-        """
+        """Connect to the AMQP broker."""
         host = self.connection_params.host
         port = self.connection_params.port
         vhost = self.connection_params.vhost
@@ -142,7 +155,7 @@ class BrokerInterfaceSync:
 
     def create_queue(self, queue_name='', exclusive=True):
         """
-        Creates a new queue.
+        Create a new queue.
 
         @param queue_name: The name of the queue.
         @type queue_name: string
@@ -180,6 +193,7 @@ class BrokerInterfaceSync:
             self.logger.exception()
 
     def __del__(self):
+        """Destructor."""
         try:
             self._connection.close()
         except Exception:
