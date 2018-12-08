@@ -24,41 +24,48 @@ class RpcClient(BrokerInterfaceSync):
         self._corr_id = None
         self._response = None
         self._exchange = ''  # TODO: pop from kwargs
-        self._callback_queue = self.create_queue()
-        self.logger.debug('Created callback queue: [{}]'.format(
-            self._callback_queue))
 
-        self._channel.basic_consume(self.on_response, no_ack=True,
-                                    queue=self._callback_queue)
-        self.logger.debug('Listening to messages from queue: [{}]'.format(
-            self._callback_queue))
+        self._channel.basic_consume(self.on_response,
+                                    no_ack=True,
+                                    queue='amq.rabbitmq.reply-to')
 
     def on_response(self, ch, method, props, body):
-        if self._corr_id == props.correlation_id:
-            self._response = body
+        self._response = body
 
     def gen_corr_id(self):
+        """Generate correlationID."""
         return str(uuid.uuid4())
 
-    def call(self, msg, background=False):
+    def call(self, msg, background=False, immediate=False,
+             on_response=None, timeout=2.0):
+        """Call RPC."""
         if not self._validate_data(msg):
-            raise TypeError("Should be of type dict")
+            raise TypeError('Should be of type dict')
         self._response = None
         self._corr_id = self.gen_corr_id()
-        self._channel.basic_publish(exchange=self._exchange,
-                                    routing_key=self._rpc_name,
-                                    properties=pika.BasicProperties(
-                                        reply_to=self._callback_queue,
-                                        correlation_id=self._corr_id,
-                                    ),
-                                    body=self._serialize_data(msg))
-        self._wait_for_response()
-        resp = self._deserialize_data(self._response)
-        return resp
+        try:
+            rpc_props = pika.BasicProperties(reply_to='amq.rabbitmq.reply-to')
+            self._channel.basic_publish(exchange=self._exchange,
+                                        routing_key=self._rpc_name,
+                                        immediate=immediate,
+                                        properties=rpc_props,
+                                        body=self._serialize_data(msg))
+            self._wait_for_response(timeout)
+            if self._response is None:
+                resp = {
+                    'error': 'RPC Response timeout'
+                }
+            else:
+                resp = self._deserialize_data(self._response)
+            return resp
+        except Exception as e:
+            print(e)
+            return {}
 
-    def _wait_for_response(self):
-        while self._response is None:
-            self._connection.process_data_events()
+    def _wait_for_response(self, timeout):
+        self.logger.debug('Waiting for response from [%s]...', self._rpc_name)
+        self._connection.process_data_events(
+            time_limit=timeout)
 
     def _serialize_data(self, data):
         """
@@ -83,6 +90,7 @@ class RpcClient(BrokerInterfaceSync):
             return resp
         except Exception:
             pass
+        print(type(data))
         resp = data.decode()
         return resp
 
