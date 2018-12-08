@@ -20,7 +20,7 @@ class ConnectionParameters(object):
                  vhost='/',
                  reconnect_attempts=5,
                  retry_delay=2.0,
-                 timeout=20.0):
+                 timeout=10.0):
         """
         Constructor.
 
