@@ -7,7 +7,7 @@ import pika
 #  import ssl
 import sys
 
-from .r4a_logger import create_logger
+from .r4a_logger import create_logger, LoggingLevel
 
 
 class ConnectionParameters(object):
@@ -85,7 +85,13 @@ class BrokerInterfaceSync(object):
         self._connection = None
         self._channel = None
         self._closing = False
+        self._debug = False
         self.logger = create_logger(self.__class__.__name__)
+
+        if 'debug' in kwargs:
+            self.debug = kwargs.pop('debug')
+        else:
+            self.debug = False
 
         if 'creds' in kwargs:
             self.credentials = kwargs.pop('creds')
@@ -103,6 +109,22 @@ class BrokerInterfaceSync(object):
 
         self._creds_pika = pika.PlainCredentials(self.credentials.username,
                                                  self.credentials.password)
+
+    @property
+    def debug(self):
+        """Debug mode flag."""
+        return self._debug
+
+    @debug.setter
+    def debug(self, val):
+        if not isinstance(val, bool):
+            raise TypeError('Value should be boolean')
+        self._debug = val
+        if self._debug is True:
+            self.logger.setLevel(LoggingLevel.DEBUG)
+        else:
+            self.logger.setLevel(LoggingLevel.INFO)
+
 
     def connect(self):
         """Connect to the AMQP broker."""

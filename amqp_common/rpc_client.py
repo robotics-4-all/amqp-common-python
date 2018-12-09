@@ -31,11 +31,12 @@ class RpcClient(BrokerInterfaceSync):
 
     def _on_response(self, ch, method, props, body):
         """Handle on-response event."""
-        self.logger.debug('Received Request:' +
+        self.logger.debug('Received Response:' +
+                          '\n- [*] Body: %s' +
                           '\n- [*] Method: %s' +
                           '\n- [*] Properties: %s' +
-                          '\n- [*] Channel: %s', method,
-                          props, ch)
+                          '\n- [*] Channel: %s',
+                          body, method, props, ch)
 
         self._response = body
 

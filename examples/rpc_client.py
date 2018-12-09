@@ -4,6 +4,7 @@
 from __future__ import print_function
 
 import sys
+
 import amqp_common
 
 
@@ -15,10 +16,14 @@ if __name__ == "__main__":
                                                    port='5672')
     rpc_client = amqp_common.RpcClient(
         rpc_name, creds=creds, connection_params=conn_params)
+
     data = {
         'a': 4,
         'b': 13
     }
 
+    resp = rpc_client.call(data)
+    print(resp)
+    rpc_client.debug = True
     resp = rpc_client.call(data)
     print(resp)
