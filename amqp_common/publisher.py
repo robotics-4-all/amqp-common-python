@@ -27,19 +27,42 @@ class PublisherSync(BrokerInterfaceSync):
         self.setup_exchange(self._topic_exchange, ExchangeTypes.Topic)
 
     def publish(self, msg):
+        """
+        Publish message once.
+
+        @param msg: Message to publish.
+        @type msg: dict
+
+        """
         self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
         self._channel.basic_publish(exchange=self._topic_exchange,
                                     routing_key=self._topic,
                                     body=self._serialize_data(msg))
 
     def pub_loop(self, data_bind, hz):
+        """
+        Publish message frequenntly.
+
+        @param data_bind: Bind to data for publishing.
+        @type data_bind: dict
+
+        @param hz: Publishing frequency.
+        @type hz: float
+
+        """
+        if hz == 0.0:  # Publish once and return
+            self.publish(data_bind)
+            return
+        if hz < 0:
+            self.logger.exception('Frequency must be in range [0+, inf]')
+            raise ValueError('Frequency must be in range [0, inf]')
         self._rate = Rate(hz)
         while True:
             try:
                 self.publish(data_bind)
                 self._rate.sleep()
-            except KeyboardInterrupt as exc:
-                print(exc)
+            except KeyboardInterrupt:
+                self.logger.exception('Process received keyboard interrupt')
                 break
 
     def _serialize_data(self, data):

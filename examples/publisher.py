@@ -10,7 +10,7 @@ import amqp_common
 
 if __name__ == '__main__':
     topic = sys.argv[1] if len(sys.argv) > 1 else 'robot_1.dummy'
-    rate = int(sys.argv[2]) if len(sys.argv) > 2 else 2
+    rate = float(sys.argv[2]) if len(sys.argv) > 2 else 2
     data = {
         'a': 10,
         'b': 20
@@ -21,4 +21,7 @@ if __name__ == '__main__':
             host='155.207.33.185', port='5672'),
         creds=amqp_common.Credentials('robot_1', 'r0b0t1'))
 
+    # Publish once
+    pub.publish(data)
+    # Bind data and publish with frequency
     pub.pub_loop(data, rate)
