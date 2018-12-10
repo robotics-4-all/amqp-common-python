@@ -19,9 +19,10 @@ class PublisherSync(BrokerInterfaceSync):
         @type topic: string
 
         """
-        BrokerInterfaceSync.__init__(self, *args, **kwargs)
         self._topic_exchange = exchange
         self._topic = topic
+        self._name = topic
+        BrokerInterfaceSync.__init__(self, *args, **kwargs)
         self.connect()
         self.setup_exchange(self._topic_exchange, ExchangeTypes.Topic)
 

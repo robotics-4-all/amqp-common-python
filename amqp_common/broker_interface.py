@@ -85,8 +85,8 @@ class BrokerInterfaceSync(object):
         self._connection = None
         self._channel = None
         self._closing = False
-        self._debug = False
-        self.logger = create_logger(self.__class__.__name__)
+        self.logger = create_logger('{}-{}'.format(
+            self.__class__.__name__, self._name))
 
         if 'debug' in kwargs:
             self.debug = kwargs.pop('debug')

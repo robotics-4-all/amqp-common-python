@@ -20,9 +20,10 @@ class RpcServer(BrokerInterfaceSync):
         @param rpc_name: The name of the RPC
         @type rpc_name: string
         """
+        self._name = rpc_name
+        self._rpc_name = rpc_name
         BrokerInterfaceSync.__init__(self, *args, **kwargs)
         self.connect()
-        self._rpc_name = rpc_name
         self._exchange = exchange
         # Bind on_request callback
         self.on_request = on_request

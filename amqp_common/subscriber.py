@@ -19,6 +19,7 @@ class SubscriberSync(BrokerInterfaceSync):
         @param connection_params: AMQP Connection Parameters
         @type connection_params: ConnectionParameters
         """
+        self._name = topic
         BrokerInterfaceSync.__init__(self, *args, **kwargs)
         self._topic = topic
         self._topic_exchange = exchange
