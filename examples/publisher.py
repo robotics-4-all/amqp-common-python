@@ -9,7 +9,7 @@ import amqp_common
 
 
 if __name__ == '__main__':
-    topic = sys.argv[1] if len(sys.argv) > 1 else 'robot_1.dummy'
+    topic = sys.argv[1] if len(sys.argv) > 1 else 'dummy'
     rate = float(sys.argv[2]) if len(sys.argv) > 2 else 2
     data = {
         'a': 10,
@@ -18,8 +18,8 @@ if __name__ == '__main__':
 
     pub = amqp_common.PublisherSync(
         topic, connection_params=amqp_common.ConnectionParameters(
-            host='155.207.33.185', port='5672'),
-        creds=amqp_common.Credentials('robot_1', 'r0b0t1'))
+            host='155.207.33.185', port='5672', vhost='/'),
+        creds=amqp_common.Credentials('bot', 'b0t'))
 
     # Publish once
     pub.publish(data)
