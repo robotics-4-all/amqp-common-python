@@ -125,7 +125,6 @@ class BrokerInterfaceSync(object):
         else:
             self.logger.setLevel(LoggingLevel.INFO)
 
-
     def connect(self):
         """Connect to the AMQP broker."""
         host = self.connection_params.host
@@ -142,7 +141,8 @@ class BrokerInterfaceSync(object):
             connection_attempts=reconnect_attempts,
             retry_delay=retry_delay,
             blocked_connection_timeout=timeout,
-            socket_timeout=timeout
+            socket_timeout=timeout,
+            virtual_host=vhost
         )
 
         try:
@@ -157,6 +157,7 @@ class BrokerInterfaceSync(object):
             return False
         self.logger.info('Connected to AMQP broker @ [{}:{}]'.format(
             host, port))
+        self.logger.info('Vhost -> {}'.format(vhost))
         return True
 
     def setup_exchange(self, exchange_name, exchange_type):
@@ -169,29 +170,59 @@ class BrokerInterfaceSync(object):
         @param exchange_type: The type of the exchange (e.g. 'topic').
         @type exchange_type: string
         """
-        self.logger.info('Declaring exchange: [name={}, type={}]'.format(
+        self.logger.debug('Declaring exchange: [name={}, type={}]'.format(
             exchange_name, exchange_type))
         self._channel.exchange_declare(exchange=exchange_name,
                                        exchange_type=exchange_type,
                                        passive=True)
 
-    def create_queue(self, queue_name='', exclusive=True):
+    def create_queue(self, queue_name='', exclusive=True,
+                     queue_size=10, queue_ttl=60000,
+                     overflow_behaviour='drop-head'):
         """
         Create a new queue.
+
+        - Overflow Behaviours: https://www.rabbitmq.com/maxlength.html#overflow-behaviour
 
         @param queue_name: The name of the queue.
         @type queue_name: string
 
         @param exclusive: Only allow access by the current connection.
         @type exclusive: bool
+
+        @param queue_size: The size of the queue
+        @type queue_size: int
+
+        @param queue_ttl: Per-queue message time-to-live
+            (https://www.rabbitmq.com/ttl.html)
+        @type queue_ttl: int
+
+        @param overflow_behaviour: Overflow behaviour - 'drop-head' ||
+            'reject-publish'
+        @type overflow_behaviour: str
         """
+        args = {
+            'x-max-length': queue_size,
+            'x-overflow': overflow_behaviour,
+            'x-message-ttl': queue_ttl
+        }
+
         result = self._channel.queue_declare(exclusive=exclusive,
                                              queue=queue_name,
                                              durable=False,
-                                             auto_delete=True)
+                                             auto_delete=True,
+                                             arguments=args)
         queue_name = result.method.queue
-        self.logger.info('Created queue [{}]'.format(queue_name))
+        self.logger.debug('Created queue [{}]'.format(queue_name))
         return queue_name
+
+    def queue_exists(self, queue_name):
+        """
+        TODO.
+        
+        https://pika.readthedocs.io/en/stable/modules/channel.html#pika.channel.Channel.queue_declare
+        """
+        pass
 
     def bind_queue(self, exchange_name, queue_name, bind_key):
         """
@@ -362,8 +393,17 @@ class BrokerInterfaceAsync(object):
         self._connection.close()
 
     def create_exchange(self, exchange_name, exchange_type):
-        self.logger.info('Declaring exchange {} [type={}]', exchange_name,
-                         exchange_type)
+        """
+        Declare/Create an exchange.
+
+        @param exchange_name: The name of the exchange
+        @type exchange_name: string
+
+        @param exchange_type: the type of the exchange
+        @type exchange_type: 
+        """
+        self.logger.debug('Declaring exchange {} [type={}]', exchange_name,
+                          exchange_type)
         self._channel.exchange_declare(self.on_exchange_declareok,
                                        exchange=exchange_name,
                                        exchange_type=exchange_type)
