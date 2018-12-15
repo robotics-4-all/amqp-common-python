@@ -53,7 +53,7 @@ class PublisherSync(BrokerInterfaceSync):
         if hz == 0.0:  # Publish once and return
             self.publish(data_bind)
             return
-        if hz < 0:
+        elif hz < 0:
             self.logger.exception('Frequency must be in range [0+, inf]')
             raise ValueError('Frequency must be in range [0, inf]')
         self._rate = Rate(hz)

@@ -17,7 +17,12 @@ class SubscriberSync(BrokerInterfaceSync):
 
     FREQ_CALC_SAMPLES_MAX = 1000
 
-    def __init__(self, topic, on_message=None, exchange='amq.topic',
+    def __init__(self, topic,
+                 on_message=None,
+                 exchange='amq.topic',
+                 queue_size=10,
+                 queue_ttl=60000,
+                 overflow='drop-head',
                  *args, **kwargs):
         """
         Constructor.
@@ -36,11 +41,16 @@ class SubscriberSync(BrokerInterfaceSync):
         self._topic = topic
         self._topic_exchange = exchange
         self._queue_name = None
+        self._queue_size = queue_size
+        self._queue_ttl = queue_ttl
+        self._overflow = overflow
         self.connect()
         self.on_msg_callback = on_message
         self.setup_exchange(self._topic_exchange, ExchangeTypes.Topic)
         # Create a queue
-        self._queue_name = self.create_queue()
+        self._queue_name = self.create_queue(queue_size=self._queue_size,
+                                             queue_ttl=self._queue_ttl,
+                                             overflow_behaviour=self._overflow)
         # Bind queue to the Topic exchange
         self.bind_queue(self._topic_exchange, self._queue_name,
                         self._topic)

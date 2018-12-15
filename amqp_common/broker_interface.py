@@ -213,7 +213,8 @@ class BrokerInterfaceSync(object):
                                              auto_delete=True,
                                              arguments=args)
         queue_name = result.method.queue
-        self.logger.debug('Created queue [{}]'.format(queue_name))
+        self.logger.debug('Created queue [{}] [size={}, ttl={}]'.format(
+            queue_name, queue_size, queue_ttl))
         return queue_name
 
     def queue_exists(self, queue_name):
