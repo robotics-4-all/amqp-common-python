@@ -20,7 +20,8 @@ class ConnectionParameters(object):
                  vhost='/',
                  reconnect_attempts=5,
                  retry_delay=2.0,
-                 timeout=10.0):
+                 timeout=10.0,
+                 heartbeat=120):
         """
         Constructor.
 
@@ -40,6 +41,7 @@ class ConnectionParameters(object):
         self.reconnect_attempts = reconnect_attempts
         self.retry_delay = retry_delay
         self.timeout = timeout
+        self.heartbeat = 120
 
 
 class ExchangeTypes(object):
@@ -134,6 +136,7 @@ class BrokerInterfaceSync(object):
         timeout = self.connection_params.timeout
         retry_delay = self.connection_params.retry_delay
         secure = self.connection_params.secure
+        heartbeat = self.connection_params.heartbeat
 
         self._connect_params = pika.ConnectionParameters(
             host=host, port=port,
@@ -142,7 +145,8 @@ class BrokerInterfaceSync(object):
             retry_delay=retry_delay,
             blocked_connection_timeout=timeout,
             socket_timeout=timeout,
-            virtual_host=vhost
+            virtual_host=vhost,
+            heartbeat=heartbeat
         )
 
         try:
