@@ -41,7 +41,7 @@ class ConnectionParameters(object):
         self.reconnect_attempts = reconnect_attempts
         self.retry_delay = retry_delay
         self.timeout = timeout
-        self.heartbeat = 120
+        self.heartbeat = heartbeat
 
 
 class ExchangeTypes(object):
