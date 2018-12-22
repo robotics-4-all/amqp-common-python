@@ -66,8 +66,10 @@ class RpcClient(BrokerInterfaceSync):
             else:
                 resp = self._deserialize_data(self._response)
             return resp
-        except Exception as e:
-            print(e)
+        except KeyboardInterrupt as e:
+            raise(e)
+        except Exception:
+            self.logger.exception('Exception thrown in rpc call')
             return {}
 
     def _wait_for_response(self, timeout):
