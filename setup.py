@@ -16,9 +16,7 @@ def read(fname):
 
 
 setup(
-    install_requires=[
-        'pika==0.12'
-    ],
+    install_requires=read('requirements.txt').splitlines(),
     name='amqp_common',
     version='0.6.0',
     description='',
