@@ -1,5 +1,5 @@
 # amqp-common-python
-Common PubSub and RPC implementations for AMQP
+Higher-level features for AMQP, such as PubSub and RPC (server-client).
 
 # Installation
 
@@ -7,6 +7,12 @@ Common PubSub and RPC implementations for AMQP
 
 ```bash
 python2 setup.py install --user
+```
+
+or
+
+```bash
+pip install . --user
 ```
 
 # Examples
