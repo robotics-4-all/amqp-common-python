@@ -13,6 +13,17 @@ from .r4a_logger import create_logger, LoggingLevel
 class ConnectionParameters(object):
     """AMQP Connection parameters."""
 
+    __slots__ = [
+        'host',
+        'port',
+        'secure',
+        'vhost',
+        'reconnect_attempts',
+        'retry_delay',
+        'timeout',
+        'hearteat'
+    ]
+
     def __init__(self,
                  host='127.0.0.1',
                  port='5672',
@@ -33,6 +44,20 @@ class ConnectionParameters(object):
 
         @param secure: Enable SSL/TLS - AMQPS
         @type secure: boolean
+
+        @param reconnect_attempts: TODO
+        @type reconnect_attempts: int
+
+        @param retry_delay: Time delay between reconnect attempts
+        @type retry_delay: float
+
+        @param timeout: Connection timeout value.
+        @type timeout: float
+
+        @param heartbeat: Set time period for sending heartbeat packages.
+            Heartbeat packages denote that the connection is alive in
+            both ends. Value is set in seconds.
+        @type heartbeat: int
         """
         self.host = host
         self.port = port
@@ -47,6 +72,13 @@ class ConnectionParameters(object):
 class ExchangeTypes(object):
     """AMQP Exchange Types."""
 
+    __slots__ = [
+        'Topic',
+        'Direct',
+        'Fanout',
+        'Default'
+    ]
+
     Topic = 'topic'
     Direct = 'direct'
     Fanout = 'fanout'
@@ -55,6 +87,11 @@ class ExchangeTypes(object):
 
 class Credentials(object):
     """Connection credentials for authn/authz."""
+
+    __slots__ = [
+        'username',
+        'password'
+    ]
 
     def __init__(self, username='guest', password='guest'):
         """
@@ -135,6 +172,7 @@ class BrokerInterfaceSync(object):
         reconnect_attempts = self.connection_params.reconnect_attempts
         timeout = self.connection_params.timeout
         retry_delay = self.connection_params.retry_delay
+        # Meh, no secure at the moment, TODO!
         secure = self.connection_params.secure
         heartbeat = self.connection_params.heartbeat
 
