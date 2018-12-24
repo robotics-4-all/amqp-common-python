@@ -21,7 +21,7 @@ class ConnectionParameters(object):
         'reconnect_attempts',
         'retry_delay',
         'timeout',
-        'hearteat'
+        'heartbeat'
     ]
 
     def __init__(self,
