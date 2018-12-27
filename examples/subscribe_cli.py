@@ -4,8 +4,9 @@
 from __future__ import print_function
 
 import argparse
-import sys
 import time
+
+from pprint import pprint
 
 import amqp_common
 
@@ -17,7 +18,8 @@ def callback(msg, meta):
     print('[*] - Channel={}'.format(channel))
     print('[*] - Method={}'.format(method))
     print('[*] - Properties={}'.format(props))
-    #  print('[*] - Data={}'.format(msg))
+    print('[*] - Data -->')
+    pprint(msg, width=1, indent=2)
 
 
 if __name__ == '__main__':
