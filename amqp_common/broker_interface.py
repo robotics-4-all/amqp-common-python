@@ -5,7 +5,6 @@ from __future__ import absolute_import
 
 import pika
 #  import ssl
-import sys
 
 from .r4a_logger import create_logger, LoggingLevel
 
@@ -262,7 +261,7 @@ class BrokerInterfaceSync(object):
     def queue_exists(self, queue_name):
         """
         TODO.
-        
+
         https://pika.readthedocs.io/en/stable/modules/channel.html#pika.channel.Channel.queue_declare
         """
         pass
@@ -359,7 +358,6 @@ class BrokerInterfaceAsync(object):
         :param str reply_text: The server provided reply_text if given
 
         """
-        self._channel = None
         if self._closing:
             self._connection.ioloop.stop()
         else:
@@ -443,7 +441,7 @@ class BrokerInterfaceAsync(object):
         @type exchange_name: string
 
         @param exchange_type: the type of the exchange
-        @type exchange_type: 
+        @type exchange_type:
         """
         self.logger.debug('Declaring exchange {} [type={}]', exchange_name,
                           exchange_type)

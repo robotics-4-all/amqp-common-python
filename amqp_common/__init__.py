@@ -6,6 +6,7 @@ from .subscriber import SubscriberSync
 from .rpc_client import RpcClient
 from .rpc_server import RpcServer
 from .broker_interface import Credentials, ConnectionParameters
+from .timer import Timer
 
 __all__ = [
     'PublisherSync',
@@ -13,5 +14,6 @@ __all__ = [
     'RpcClient',
     'RpcServer',
     'Credentials',
-    'ConnectionParameters'
+    'ConnectionParameters',
+    'Timer'
 ]

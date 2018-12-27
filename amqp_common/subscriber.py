@@ -6,7 +6,7 @@ from __future__ import absolute_import
 from collections import deque
 import json
 import time
-from threading import Thread
+from threading import Thread, Semaphore
 
 
 from .broker_interface import BrokerInterfaceSync, Credentials, ExchangeTypes
@@ -15,7 +15,7 @@ from .broker_interface import BrokerInterfaceSync, Credentials, ExchangeTypes
 class SubscriberSync(BrokerInterfaceSync):
     """."""
 
-    FREQ_CALC_SAMPLES_MAX = 1000
+    FREQ_CALC_SAMPLES_MAX = 100
 
     def __init__(self, topic,
                  on_message=None,
@@ -45,7 +45,8 @@ class SubscriberSync(BrokerInterfaceSync):
         self._queue_ttl = queue_ttl
         self._overflow = overflow
         self.connect()
-        self.on_msg_callback = on_message
+        if on_message is not None:
+            self.onmessage = on_message
         self.setup_exchange(self._topic_exchange, ExchangeTypes.Topic)
         # Create a queue
         self._queue_name = self.create_queue(queue_size=self._queue_size,
@@ -56,12 +57,12 @@ class SubscriberSync(BrokerInterfaceSync):
                         self._topic)
         self._last_msg_ts = None
         self._msg_freq_fifo = deque(maxlen=self.FREQ_CALC_SAMPLES_MAX)
-        self._hz = -1
+        self._hz = 0
+        self._sem = Semaphore()
 
     @property
     def hz(self):
         """Incoming mesasge frequency."""
-        self._calc_msg_frequency()
         return self._hz
 
     def run(self):
@@ -91,23 +92,32 @@ class SubscriberSync(BrokerInterfaceSync):
         #  print(msg_trans_delay)
         msg = self._deserialize_data(body)
 
-        if self.on_msg_callback is not None:
+        self._sem.acquire()
+        self._calc_msg_frequency()
+        self._sem.release()
+
+        if self.onmessage is not None:
             meta = {
                 'channel': ch,
                 'method': method,
                 'properties': properties
             }
-            self.on_msg_callback(msg, meta)
+            self.onmessage(msg, meta)
+
 
     def _calc_msg_frequency(self):
         ts = time.time()
         if self._last_msg_ts is not None:
             diff = ts - self._last_msg_ts
-            hz = 1.0 / float(diff)
-            self._msg_freq_fifo.appendleft(hz)
-            for s in self._msg_freq_fifo:
-                print(s)
-            self._hz = sum(s for s in self._msg_freq_fifo if s is not 0) / len(self._msg_freq_fifo)
+            if diff < 10e-3:
+                self._last_msg_ts = ts
+                return
+            else:
+                hz = 1.0 / float(diff)
+                self._msg_freq_fifo.appendleft(hz)
+                hz_list = [s for s in self._msg_freq_fifo if s != 0]
+                _sum = sum(hz_list)
+                self._hz = _sum / len(hz_list)
         self._last_msg_ts = ts
 
     def _deserialize_data(self, data):
