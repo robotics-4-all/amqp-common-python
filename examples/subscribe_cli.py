@@ -5,8 +5,7 @@ from __future__ import print_function
 
 import argparse
 import time
-
-from pprint import pprint
+import json
 
 import amqp_common
 
@@ -19,7 +18,7 @@ def callback(msg, meta):
     print('[*] - Method={}'.format(method))
     print('[*] - Properties={}'.format(props))
     print('[*] - Data -->')
-    pprint(msg, width=1, indent=2)
+    print(json.dumps(msg, indent=2))
 
 
 if __name__ == '__main__':
