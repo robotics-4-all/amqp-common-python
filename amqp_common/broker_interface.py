@@ -63,6 +63,25 @@ class ConnectionParameters(object):
         self.blocked_connection_timeout = blocked_connection_timeout
         self.heartbeat = heartbeat
 
+        if creds is None:
+            self.creds = Credentials()
+        else:
+            self.creds = creds
+
+    def transform_to_pika(self):
+        params = pika.ConnectionParameters(
+            host=self.host, port=self.port,
+            credentials=self.creds.transform_to_pika(),
+            connection_attempts=self.reconnect_attempts,
+            retry_delay=self.retry_delay,
+            blocked_connection_timeout=self.timeout,
+            socket_timeout=self.timeout,
+            virtual_host=self.vhost,
+            heartbeat=self.heartbeat
+        )
+        return params
+
+
 
 class ExchangeTypes(object):
     """AMQP Exchange Types."""
@@ -94,13 +113,23 @@ class Credentials(object):
         self.username = username
         self.password = password
 
+    def transform_to_pika(self):
+        creds = pika.PlainCredentials(self.credentials.username,
+                                      self.credentials.password)
+        return creds
 
-class SharedConnection(object):
+
+class SharedConnection(pika.BlockingConnection):
     """Shared Connection."""
 
-    def __init__(self):
+    def __init__(self, connection_params):
         """Constructor."""
-        pass
+        self._connection_params = connection_params
+        self._pika_connection = None
+
+    def _create_pika_connection(self):
+        self._pika_connection = pika.BlockingConnection(
+            self._connection_params.transform_to_pika())
 
 
 class BrokerInterfaceSync(object):
@@ -132,9 +161,8 @@ class BrokerInterfaceSync(object):
 
         if 'connection' in kwargs:
             self._connection = kwargs.pop('connection')
-
-        self._creds_pika = pika.PlainCredentials(self.credentials.username,
-                                                 self.credentials.password)
+        else:
+            self._connection = None
 
     @property
     def debug(self):
@@ -153,6 +181,9 @@ class BrokerInterfaceSync(object):
 
     def connect(self):
         """Connect to the AMQP broker."""
+        if self._connection is not None:
+            self.logger.info('Using allready existing connection [{}]'.format(''))
+            return True
         host = self.connection_params.host
         port = self.connection_params.port
         vhost = self.connection_params.vhost
@@ -176,18 +207,16 @@ class BrokerInterfaceSync(object):
             heartbeat=heartbeat)
 
         try:
-            if self._connection is None:
-                # Create a new connection
-                self._connection = pika.BlockingConnection(
-                    self._connect_params)
+            # Create a new connection
+            self._connection = pika.BlockingConnection(
+                self._connect_params)
             self._channel = self._connection.channel()
         except Exception as exc:
             self.logger.exception('')
-            raise exc
+            raise(exc)
             return False
-        self.logger.info('Connected to AMQP broker @ [{}:{}]'.format(
-            host, port))
-        self.logger.info('Vhost -> {}'.format(vhost))
+        self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
+            host, port, vhost))
         return True
 
     def setup_exchange(self, exchange_name, exchange_type):
