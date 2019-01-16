@@ -13,14 +13,8 @@ class ConnectionParameters(object):
     """AMQP Connection parameters."""
 
     __slots__ = [
-        'host',
-        'port',
-        'secure',
-        'vhost',
-        'reconnect_attempts',
-        'retry_delay',
-        'timeout',
-        'heartbeat'
+        'host', 'port', 'secure', 'vhost', 'reconnect_attempts', 'retry_delay',
+        'timeout', 'heartbeat'
     ]
 
     def __init__(self,
@@ -31,6 +25,7 @@ class ConnectionParameters(object):
                  reconnect_attempts=5,
                  retry_delay=2.0,
                  timeout=10.0,
+                 blocked_connection_timeout=None,
                  heartbeat=120):
         """
         Constructor.
@@ -65,18 +60,14 @@ class ConnectionParameters(object):
         self.reconnect_attempts = reconnect_attempts
         self.retry_delay = retry_delay
         self.timeout = timeout
+        self.blocked_connection_timeout = blocked_connection_timeout
         self.heartbeat = heartbeat
 
 
 class ExchangeTypes(object):
     """AMQP Exchange Types."""
 
-    __slots__ = [
-        'Topic',
-        'Direct',
-        'Fanout',
-        'Default'
-    ]
+    __slots__ = ['Topic', 'Direct', 'Fanout', 'Default']
 
     Topic = 'topic'
     Direct = 'direct'
@@ -87,10 +78,7 @@ class ExchangeTypes(object):
 class Credentials(object):
     """Connection credentials for authn/authz."""
 
-    __slots__ = [
-        'username',
-        'password'
-    ]
+    __slots__ = ['username', 'password']
 
     def __init__(self, username='guest', password='guest'):
         """
@@ -123,8 +111,8 @@ class BrokerInterfaceSync(object):
         self._connection = None
         self._channel = None
         self._closing = False
-        self.logger = create_logger('{}-{}'.format(
-            self.__class__.__name__, self._name))
+        self.logger = create_logger('{}-{}'.format(self.__class__.__name__,
+                                                   self._name))
 
         if 'debug' in kwargs:
             self.debug = kwargs.pop('debug')
@@ -170,21 +158,22 @@ class BrokerInterfaceSync(object):
         vhost = self.connection_params.vhost
         reconnect_attempts = self.connection_params.reconnect_attempts
         timeout = self.connection_params.timeout
+        blocked_connection_timeout = self.connection_params.blocked_connection_timeout
         retry_delay = self.connection_params.retry_delay
         # Meh, no secure at the moment, TODO!
         secure = self.connection_params.secure
         heartbeat = self.connection_params.heartbeat
 
         self._connect_params = pika.ConnectionParameters(
-            host=host, port=port,
+            host=host,
+            port=port,
             credentials=self._creds_pika,
             connection_attempts=reconnect_attempts,
             retry_delay=retry_delay,
-            blocked_connection_timeout=timeout,
+            blocked_connection_timeout=blocked_connection_timeout,
             socket_timeout=timeout,
             virtual_host=vhost,
-            heartbeat=heartbeat
-        )
+            heartbeat=heartbeat)
 
         try:
             if self._connection is None:
@@ -213,12 +202,14 @@ class BrokerInterfaceSync(object):
         """
         self.logger.debug('Declaring exchange: [name={}, type={}]'.format(
             exchange_name, exchange_type))
-        self._channel.exchange_declare(exchange=exchange_name,
-                                       exchange_type=exchange_type,
-                                       passive=True)
+        self._channel.exchange_declare(
+            exchange=exchange_name, exchange_type=exchange_type, passive=True)
 
-    def create_queue(self, queue_name='', exclusive=True,
-                     queue_size=10, queue_ttl=60000,
+    def create_queue(self,
+                     queue_name='',
+                     exclusive=True,
+                     queue_size=10,
+                     queue_ttl=60000,
                      overflow_behaviour='drop-head'):
         """
         Create a new queue.
@@ -248,11 +239,12 @@ class BrokerInterfaceSync(object):
             'x-message-ttl': queue_ttl
         }
 
-        result = self._channel.queue_declare(exclusive=exclusive,
-                                             queue=queue_name,
-                                             durable=False,
-                                             auto_delete=True,
-                                             arguments=args)
+        result = self._channel.queue_declare(
+            exclusive=exclusive,
+            queue=queue_name,
+            durable=False,
+            auto_delete=True,
+            arguments=args)
         queue_name = result.method.queue
         self.logger.debug('Created queue [{}] [size={}, ttl={}]'.format(
             queue_name, queue_size, queue_ttl))
@@ -281,9 +273,8 @@ class BrokerInterfaceSync(object):
         """
         self.logger.info('Subscribed to topic: {}'.format(bind_key))
         try:
-            self._channel.queue_bind(exchange=exchange_name,
-                                     queue=queue_name,
-                                     routing_key=bind_key)
+            self._channel.queue_bind(
+                exchange=exchange_name, queue=queue_name, routing_key=bind_key)
         except Exception:
             self.logger.exception()
 
@@ -298,8 +289,7 @@ class BrokerInterfaceSync(object):
 class BrokerInterfaceAsync(object):
     CONNECTION_TIMEOUT_SEC = 5
 
-    def __init__(self, host='127.0.0.1', port='5672',
-                 exchange='amq.topic'):
+    def __init__(self, host='127.0.0.1', port='5672', exchange='amq.topic'):
         self._connection = None
         self._channel = None
         self._closing = False
@@ -319,8 +309,7 @@ class BrokerInterfaceAsync(object):
         self.logger.info("Connecting to AMQP broker @ [{}:{}] ...".format(
             self._host, self._port))
         connection = pika.SelectConnection(
-            pika.URLParameters(host=self.host,
-                               port=self.port),
+            pika.URLParameters(host=self.host, port=self.port),
             self.on_connection_open,
             stop_ioloop_on_close=False)
         return connection
@@ -429,8 +418,8 @@ class BrokerInterfaceAsync(object):
         :param str reply_text: The text reason the channel was closed
 
         """
-        self.logger.warning('Channel %i was closed: (%s) %s',
-                            channel, reply_code, reply_text)
+        self.logger.warning('Channel %i was closed: (%s) %s', channel,
+                            reply_code, reply_text)
         self._connection.close()
 
     def create_exchange(self, exchange_name, exchange_type):
@@ -445,13 +434,13 @@ class BrokerInterfaceAsync(object):
         """
         self.logger.debug('Declaring exchange {} [type={}]', exchange_name,
                           exchange_type)
-        self._channel.exchange_declare(self.on_exchange_declareok,
-                                       exchange=exchange_name,
-                                       exchange_type=exchange_type)
+        self._channel.exchange_declare(
+            self.on_exchange_declareok,
+            exchange=exchange_name,
+            exchange_type=exchange_type)
 
     def _create_queue(self, queue_name=''):
-        result = self._channel.queue_declare(exclusive=True,
-                                             queue=queue_name)
+        result = self._channel.queue_declare(exclusive=True, queue=queue_name)
         queue_name = result.method.queue
         self._queue_name = queue_name
         self.logger.info("Created queue [{}]".format(queue_name))
@@ -459,9 +448,8 @@ class BrokerInterfaceAsync(object):
 
     def _bind_queue(self, exchange_name, queue_name, bind_key):
         try:
-            self._channel.queue_bind(exchange=exchange_name,
-                                     queue=queue_name,
-                                     routing_key=bind_key)
+            self._channel.queue_bind(
+                exchange=exchange_name, queue=queue_name, routing_key=bind_key)
         except Exception:
             self.logger.exception()
 
