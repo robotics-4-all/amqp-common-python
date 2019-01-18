@@ -4,13 +4,14 @@
 from __future__ import absolute_import
 
 import json
+import time
 
-from .broker_interface import BrokerInterfaceSync, Credentials, ExchangeTypes
+from .broker_interface import (BrokerInterfaceSync, Credentials, ExchangeTypes,
+                               MessageProperties)
 from .rate import Rate
 
 
 class PublisherSync(BrokerInterfaceSync):
-
     def __init__(self, topic, exchange='amq.topic', *args, **kwargs):
         """
         Constructor.
@@ -29,15 +30,34 @@ class PublisherSync(BrokerInterfaceSync):
     def publish(self, msg):
         """
         Publish message once.
+        TODO: 1) Add message publishing timestamp
+              2) Add Content-Type (handled at the application layer)
+              3) Add Content-Encoding (handled at the application layer)
 
         @param msg: Message to publish.
         @type msg: dict
 
         """
+        content_type = ''
+        if isinstance(msg, dict):
+            content_type = 'application/json'
+            content_encoding = 'utf8'
+        elif isinstance(msg, str):
+            content_type = 'text/plain'
+        #  elif isinstance(msg, unicode):
+        #  content_type = 'text/plain'
+
+        msg_props = MessageProperties(
+            content_type=content_type,
+            content_encoding=content_encoding,
+            timestamp=int(time.time()))
+
         self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
-        self._channel.basic_publish(exchange=self._topic_exchange,
-                                    routing_key=self._topic,
-                                    body=self._serialize_data(msg))
+        self._channel.basic_publish(
+            exchange=self._topic_exchange,
+            routing_key=self._topic,
+            #  properties=msg_props
+            body=self._serialize_data(msg))
 
     def pub_loop(self, data_bind, hz):
         """

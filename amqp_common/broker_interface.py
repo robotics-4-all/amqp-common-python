@@ -3,55 +3,89 @@
 
 from __future__ import absolute_import
 
+import time
+
 import pika
 #  import ssl
 
 from .r4a_logger import create_logger, LoggingLevel
 
 
-class ConnectionParameters(object):
+class MessageProperties(pika.BasicProperties):
+    def __init__(self, content_type='', content_encoding='', timestamp=None):
+        """Message Properties/Attribures used for sending and receiving messages.
+
+        @param content_type:
+
+        @param content_encoding:
+
+        @param timestamp
+
+        """
+        if timestamp is None:
+            timestamp = time.time()
+        super(MessageProperties, self).__init__(
+            content_type=content_type,
+            content_encoding=content_encoding,
+            timestamp=timestamp)
+
+
+class ConnectionParameters(pika.ConnectionParameters):
     """AMQP Connection parameters."""
 
     __slots__ = [
         'host', 'port', 'secure', 'vhost', 'reconnect_attempts', 'retry_delay',
-        'timeout', 'heartbeat'
+        'timeout', 'heartbeat_timeout', 'blocked_connection_timeout', 'creds'
     ]
 
     def __init__(self,
                  host='127.0.0.1',
                  port='5672',
+                 creds=None,
                  secure=False,
                  vhost='/',
                  reconnect_attempts=5,
                  retry_delay=2.0,
-                 timeout=10.0,
+                 timeout=120,
                  blocked_connection_timeout=None,
-                 heartbeat=120):
+                 heartbeat_timeout=60):
         """
         Constructor.
 
-        @param host: Hostname of AMQP broker
+        @param host: Hostname of AMQP broker to connect to.
         @type host: string
 
-        @param port: AMQP broker listening port
+        @param port: AMQP broker listening port.
         @type port: string
 
-        @param secure: Enable SSL/TLS - AMQPS
+        @param creds: AUth Credentials.
+        @type creds: Credentials
+
+        @param secure: Enable SSL/TLS (AMQPS) - Not used!!
         @type secure: boolean
 
         @param reconnect_attempts: TODO
         @type reconnect_attempts: int
 
-        @param retry_delay: Time delay between reconnect attempts
+        @param retry_delay: Time delay between reconnect attempts.
         @type retry_delay: float
 
-        @param timeout: Connection timeout value.
+        @param timeout: Socket Connection timeout value.
         @type timeout: float
 
-        @param heartbeat: Set time period for sending heartbeat packages.
-            Heartbeat packages denote that the connection is alive in
-            both ends. Value is set in seconds.
-        @type heartbeat: int
+        @param timeout: Blocked Connection timeout value.
+            Set the timeout, in seconds, that the connection may remain blocked
+            (triggered by Connection.Blocked from broker). If the timeout expires
+            before connection becomes unblocked, the connection will be torn down.
+        @type timeout: float
+
+        @param heartbeat_timeout: Controls AMQP heartbeat timeout negotiation
+            during connection tuning. An integer value always overrides the value
+            proposed by broker. Use 0 to deactivate heartbeats and None to always
+            accept the broker's proposal. The value passed for timeout is also
+            used to calculate an interval at which a heartbeat frame is sent to
+            the broker. The interval is equal to the timeout value divided by two.
+        @type heartbeat_timeout: int
         """
         self.host = host
         self.port = port
@@ -61,26 +95,22 @@ class ConnectionParameters(object):
         self.retry_delay = retry_delay
         self.timeout = timeout
         self.blocked_connection_timeout = blocked_connection_timeout
-        self.heartbeat = heartbeat
+        self.heartbeat_timeout = heartbeat_timeout
 
         if creds is None:
-            self.creds = Credentials()
-        else:
-            self.creds = creds
+            creds = Credentials()
+        self.creds = creds
 
-    def transform_to_pika(self):
-        params = pika.ConnectionParameters(
-            host=self.host, port=self.port,
-            credentials=self.creds.transform_to_pika(),
+        super(ConnectionParameters, self).__init__(
+            host=self.host,
+            port=self.port,
+            credentials=creds,
             connection_attempts=self.reconnect_attempts,
             retry_delay=self.retry_delay,
-            blocked_connection_timeout=self.timeout,
+            blocked_connection_timeout=self.blocked_connection_timeout,
             socket_timeout=self.timeout,
             virtual_host=self.vhost,
-            heartbeat=self.heartbeat
-        )
-        return params
-
+            heartbeat=self.heartbeat_timeout)
 
 
 class ExchangeTypes(object):
@@ -94,8 +124,10 @@ class ExchangeTypes(object):
     Default = ''
 
 
-class Credentials(object):
-    """Connection credentials for authn/authz."""
+class Credentials(pika.PlainCredentials):
+    """Connection credentials for authn/authz.
+    TODO: Inherit from pika.PlainCredentials
+    """
 
     __slots__ = ['username', 'password']
 
@@ -110,13 +142,7 @@ class Credentials(object):
         @type password: string
 
         """
-        self.username = username
-        self.password = password
-
-    def transform_to_pika(self):
-        creds = pika.PlainCredentials(self.credentials.username,
-                                      self.credentials.password)
-        return creds
+        super(Credentials, self).__init__(username=username, password=password)
 
 
 class SharedConnection(pika.BlockingConnection):
@@ -126,10 +152,6 @@ class SharedConnection(pika.BlockingConnection):
         """Constructor."""
         self._connection_params = connection_params
         self._pika_connection = None
-
-    def _create_pika_connection(self):
-        self._pika_connection = pika.BlockingConnection(
-            self._connection_params.transform_to_pika())
 
 
 class BrokerInterfaceSync(object):
@@ -180,25 +202,28 @@ class BrokerInterfaceSync(object):
             self.logger.setLevel(LoggingLevel.INFO)
 
     def connect(self):
-        """Connect to the AMQP broker."""
+        """Connect to the AMQP broker. Creates a new channel."""
         if self._connection is not None:
-            self.logger.info('Using allready existing connection [{}]'.format(''))
+            self.logger.warn(
+                'Using allready existing connection [{}]'.format(''))
+            self._connection.channel()
             return True
         host = self.connection_params.host
         port = self.connection_params.port
         vhost = self.connection_params.vhost
         reconnect_attempts = self.connection_params.reconnect_attempts
         timeout = self.connection_params.timeout
-        blocked_connection_timeout = self.connection_params.blocked_connection_timeout
+        blocked_connection_timeout = \
+            self.connection_params.blocked_connection_timeout
         retry_delay = self.connection_params.retry_delay
         # Meh, no secure at the moment, TODO!
-        secure = self.connection_params.secure
-        heartbeat = self.connection_params.heartbeat
+        #  secure = self.connection_params.secure
+        heartbeat = self.connection_params.heartbeat_timeout
 
         self._connect_params = pika.ConnectionParameters(
             host=host,
             port=port,
-            credentials=self._creds_pika,
+            credentials=self.credentials,
             connection_attempts=reconnect_attempts,
             retry_delay=retry_delay,
             blocked_connection_timeout=blocked_connection_timeout,
@@ -208,12 +233,11 @@ class BrokerInterfaceSync(object):
 
         try:
             # Create a new connection
-            self._connection = pika.BlockingConnection(
-                self._connect_params)
+            self._connection = pika.BlockingConnection(self._connect_params)
             self._channel = self._connection.channel()
         except Exception as exc:
             self.logger.exception('')
-            raise(exc)
+            raise (exc)
             return False
         self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
             host, port, vhost))
