@@ -10,7 +10,8 @@ import json
 
 import pika
 
-from .broker_interface import AMQPTransportSync, ExchangeTypes
+from .amqp_transport import (AMQPTransportSync, Credentials, ExchangeTypes,
+                             MessageProperties)
 
 
 class RpcServer(AMQPTransportSync):
