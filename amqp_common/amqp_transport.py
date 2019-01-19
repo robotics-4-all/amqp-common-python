@@ -154,7 +154,7 @@ class SharedConnection(pika.BlockingConnection):
         self._pika_connection = None
 
 
-class BrokerInterfaceSync(object):
+class AMQPTransportSync(object):
     """Broker Interface."""
 
     def __init__(self, *args, **kwargs):

@@ -6,12 +6,12 @@ from __future__ import absolute_import
 import json
 import time
 
-from .broker_interface import (BrokerInterfaceSync, Credentials, ExchangeTypes,
-                               MessageProperties)
+from .amqp_transport import (AMQPTransportSync, Credentials, ExchangeTypes,
+                             MessageProperties)
 from .rate import Rate
 
 
-class PublisherSync(BrokerInterfaceSync):
+class PublisherSync(AMQPTransportSync):
     def __init__(self, topic, exchange='amq.topic', *args, **kwargs):
         """
         Constructor.
@@ -23,7 +23,7 @@ class PublisherSync(BrokerInterfaceSync):
         self._topic_exchange = exchange
         self._topic = topic
         self._name = topic
-        BrokerInterfaceSync.__init__(self, *args, **kwargs)
+        AMQPTransportSync.__init__(self, *args, **kwargs)
         self.connect()
         self.setup_exchange(self._topic_exchange, ExchangeTypes.Topic)
 
@@ -44,6 +44,7 @@ class PublisherSync(BrokerInterfaceSync):
             content_encoding = 'utf8'
         elif isinstance(msg, str):
             content_type = 'text/plain'
+            content_encoding = 'utf8'
         #  elif isinstance(msg, unicode):
         #  content_type = 'text/plain'
 
@@ -56,7 +57,7 @@ class PublisherSync(BrokerInterfaceSync):
         self._channel.basic_publish(
             exchange=self._topic_exchange,
             routing_key=self._topic,
-            #  properties=msg_props
+            properties=msg_props,
             body=self._serialize_data(msg))
 
     def pub_loop(self, data_bind, hz):

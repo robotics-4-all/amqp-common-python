@@ -1,10 +1,8 @@
 from __future__ import absolute_import
 
 
-from .publisher import PublisherSync
-from .subscriber import SubscriberSync
-from .rpc_client import RpcClient
-from .rpc_server import RpcServer
+from .pubsub import PublisherSync, SubscriberSync
+from .rpc import RPCClient, RPCServer
 from .broker_interface import Credentials, ConnectionParameters
 from .timer import Timer
 
