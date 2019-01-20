@@ -53,7 +53,10 @@ class RpcServer(AMQPTransportSync):
         try:
             msg = self._deserialize_data(body)
             meta = {'channel': ch, 'method': method, 'properties': properties}
-            resp = self.on_request(msg, meta)
+            if self.on_request is not None:
+                resp = self.on_request(msg, meta)
+            else:
+                resp = {'error': 'Not Implemented'}
         except Exception as e:
             self.logger.exception('')
             resp = {'error': str(e)}
