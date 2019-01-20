@@ -271,11 +271,9 @@ class AMQPTransportSync(object):
                      queue_size=10,
                      message_ttl=60000,
                      overflow_behaviour='drop-head',
-                     expires=1800000):
+                     expires=600000):
         """
         Create a new queue.
-
-        - Overflow Behaviours: https://www.rabbitmq.com/maxlength.html#overflow-behaviour
 
         @param queue_name: The name of the queue.
         @type queue_name: string
@@ -291,13 +289,15 @@ class AMQPTransportSync(object):
         @type message_ttl: int
 
         @param overflow_behaviour: Overflow behaviour - 'drop-head' ||
-            'reject-publish'
+            'reject-publish'.
+            https://www.rabbitmq.com/maxlength.html#overflow-behaviour
         @type overflow_behaviour: str
 
         @param expires: Queues will expire after a period of time only
             when they are not used (e.g. do not have consumers).
             This feature can be used together with the auto-delete
             queue property. The value is expressed in milliseconds (ms).
+            Default value is 10 minutes.
             https://www.rabbitmq.com/ttl.html#queue-ttl
         """
         args = {
