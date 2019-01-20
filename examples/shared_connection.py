@@ -3,17 +3,19 @@
 
 from __future__ import print_function
 
-import sys
 import time
 import argparse
 
 import amqp_common
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='AMQP Publisher CLI.')
-    parser.add_argument('topic', action='store', help='Topic to publish.')
+    parser = argparse.ArgumentParser(description='AMQP SharedConnection CLI.')
     parser.add_argument(
-        '--hz', dest='hz', help='Publishing frequency', type=int, default=2)
+        '--hz',
+        dest='hz',
+        help='Publishing frequency',
+        type=float,
+        default=1.0)
     parser.add_argument(
         '--host',
         dest='host',
@@ -40,6 +42,11 @@ if __name__ == '__main__':
         help='Authentication password',
         default='b0t')
     parser.add_argument(
+        '--channels',
+        dest='num_channels',
+        help='Number of channels to open.',
+        default=9)
+    parser.add_argument(
         '--debug',
         dest='debug',
         help='Enable debugging',
@@ -54,9 +61,9 @@ if __name__ == '__main__':
     vhost = args.vhost
     username = args.username
     password = args.password
-    topic = args.topic
+    topic = 'test'
     debug = True if args.debug else False
-    num_channels = 128
+    num_channels = args.num_channels
 
     data = {'a': 10, 'b': 20}
 
@@ -72,20 +79,20 @@ if __name__ == '__main__':
         pub = amqp_common.PublisherSync(topic, connection=conn, debug=debug)
         rpc_name = 'rpc-' + str(long(time.time() * 1000))
         rpc_server = amqp_common.RpcServer(
+            rpc_name, connection_params=conn_params, debug=debug)
+        rpc_server.run_threaded()
+        rpc_client = amqp_common.RpcClient(
             rpc_name, connection=conn, debug=debug)
-        rpc_client = amqp_common.RpcClient(rpc_name, connection=conn)
 
         pubs.append(pub)
         rpc_servers.append(rpc_server)
         rpc_clients.append(rpc_client)
 
-    # Publish once
-    rate = amqp_common.Rate(hz)
+    rate = amqp_common.Rate(int(hz))
     while True:
         for p in pubs:
             p.publish(data)
         for c in rpc_clients:
-            c.call(data)
-
+            resp = c.call(data)
+            print('RESPONSE: {}'.format(resp))
         rate.sleep()
-    # Bind data and publish with frequency
