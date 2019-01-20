@@ -48,7 +48,8 @@ class ConnectionParameters(pika.ConnectionParameters):
                  retry_delay=2.0,
                  timeout=120,
                  blocked_connection_timeout=None,
-                 heartbeat_timeout=60):
+                 heartbeat_timeout=60,
+                 channel_max=128):
         """
         Constructor.
 
@@ -86,6 +87,10 @@ class ConnectionParameters(pika.ConnectionParameters):
             used to calculate an interval at which a heartbeat frame is sent to
             the broker. The interval is equal to the timeout value divided by two.
         @type heartbeat_timeout: int
+
+        @param channel_max: The max permissible number of channels per connection.
+            Defaults to 128
+        @type channel_max: int
         """
         self.host = host
         self.port = port
@@ -96,6 +101,7 @@ class ConnectionParameters(pika.ConnectionParameters):
         self.timeout = timeout
         self.blocked_connection_timeout = blocked_connection_timeout
         self.heartbeat_timeout = heartbeat_timeout
+        self.channel_max = channel_max
 
         if creds is None:
             creds = Credentials()
@@ -110,7 +116,8 @@ class ConnectionParameters(pika.ConnectionParameters):
             blocked_connection_timeout=self.blocked_connection_timeout,
             socket_timeout=self.timeout,
             virtual_host=self.vhost,
-            heartbeat=self.heartbeat_timeout)
+            heartbeat=self.heartbeat_timeout,
+            channel_max=self.channel_max)
 
 
 class ExchangeTypes(object):
@@ -243,7 +250,7 @@ class AMQPTransportSync(object):
             host, port, vhost))
         return True
 
-    def setup_exchange(self, exchange_name, exchange_type):
+    def create_exchange(self, exchange_name, exchange_type):
         """
         Create a new exchange.
 
