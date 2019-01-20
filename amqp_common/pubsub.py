@@ -27,7 +27,7 @@ class PublisherSync(AMQPTransportSync):
         self._name = topic
         AMQPTransportSync.__init__(self, *args, **kwargs)
         self.connect()
-        self.setup_exchange(self._topic_exchange, ExchangeTypes.Topic)
+        self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
 
     def publish(self, msg):
         """
@@ -97,7 +97,7 @@ class PublisherSync(AMQPTransportSync):
 
 
 class SubscriberSync(AMQPTransportSync):
-    """."""
+    """Subscriber implementation in AMQP protocol."""
 
     FREQ_CALC_SAMPLES_MAX = 100
 
@@ -133,7 +133,7 @@ class SubscriberSync(AMQPTransportSync):
         self.connect()
         if on_message is not None:
             self.onmessage = on_message
-        self.setup_exchange(self._topic_exchange, ExchangeTypes.Topic)
+        self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
         # Create a queue
         self._queue_name = self.create_queue(
             queue_size=self._queue_size,
@@ -168,7 +168,8 @@ class SubscriberSync(AMQPTransportSync):
         try:
             self._channel.start_consuming()
         except KeyboardInterrupt as exc:
-            print(exc)
+            # Log error with traceback
+            self.logger.error(exc, exc_info=True)
 
     def _on_msg_callback_wrapper(self, ch, method, properties, body):
         #  ts_send = properties.headers['timestamp_in_ms']
