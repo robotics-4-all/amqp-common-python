@@ -58,13 +58,15 @@ class RpcServer(AMQPTransportSync):
             self.logger.exception('')
             resp = {'error': str(e)}
         resp_serial = self._serialize_data(resp)
-        pub_props = pika.BasicProperties(
-            correlation_id=properties.correlation_id)
+
+        msg_props = MessageProperties(correlation_id=properties.correlation_id)
+
         ch.basic_publish(
             exchange=self._exchange,
             routing_key=properties.reply_to,
-            properties=pub_props,
+            properties=msg_props,
             body=resp_serial)
+        # Acknowledge receivving the message.
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def _serialize_data(self, data):
@@ -127,14 +129,18 @@ class RpcClient(AMQPTransportSync):
         self._response = None
         self._corr_id = self.gen_corr_id()
         try:
-            rpc_props = pika.BasicProperties(reply_to='amq.rabbitmq.reply-to')
+            # Direct reply-to implementation
+            rpc_props = MessageProperties(reply_to='amq.rabbitmq.reply-to')
+
             self._channel.basic_publish(
                 exchange=self._exchange,
                 routing_key=self._rpc_name,
                 immediate=immediate,
                 properties=rpc_props,
                 body=self._serialize_data(msg))
+
             self._wait_for_response(timeout)
+
             if self._response is None:
                 resp = {'error': 'RPC Response timeout'}
             else:
