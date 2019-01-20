@@ -53,7 +53,7 @@ class PublisherSync(AMQPTransportSync):
         msg_props = MessageProperties(
             content_type=content_type,
             content_encoding=content_encoding,
-            timestamp=int(time.time()))
+            timestamp=long((time.time() + 0.5) * 1000))
 
         self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
         self._channel.basic_publish(
