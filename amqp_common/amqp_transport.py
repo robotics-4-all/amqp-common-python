@@ -264,7 +264,7 @@ class AMQPTransportSync(object):
                      queue_size=10,
                      message_ttl=60000,
                      overflow_behaviour='drop-head',
-                     expires=10000):
+                     expires=1800000):
         """
         Create a new queue.
 
