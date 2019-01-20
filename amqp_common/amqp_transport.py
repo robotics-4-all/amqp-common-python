@@ -12,7 +12,12 @@ from .r4a_logger import create_logger, LoggingLevel
 
 
 class MessageProperties(pika.BasicProperties):
-    def __init__(self, content_type='', content_encoding='', timestamp=None):
+    def __init__(self,
+                 content_type=None,
+                 content_encoding=None,
+                 timestamp=None,
+                 correlation_id=None,
+                 reply_to=None):
         """Message Properties/Attribures used for sending and receiving messages.
 
         @param content_type:
@@ -23,11 +28,13 @@ class MessageProperties(pika.BasicProperties):
 
         """
         if timestamp is None:
-            timestamp = time.time()
+            timestamp = long((time.time() + 0.5) * 1000)
         super(MessageProperties, self).__init__(
             content_type=content_type,
             content_encoding=content_encoding,
-            timestamp=timestamp)
+            timestamp=timestamp,
+            correlation_id=correlation_id,
+            reply_to=reply_to)
 
 
 class ConnectionParameters(pika.ConnectionParameters):
@@ -105,19 +112,18 @@ class ConnectionParameters(pika.ConnectionParameters):
 
         if creds is None:
             creds = Credentials()
-        self.creds = creds
 
         super(ConnectionParameters, self).__init__(
-            host=self.host,
-            port=self.port,
+            host=host,
+            port=port,
             credentials=creds,
-            connection_attempts=self.reconnect_attempts,
-            retry_delay=self.retry_delay,
-            blocked_connection_timeout=self.blocked_connection_timeout,
-            socket_timeout=self.timeout,
-            virtual_host=self.vhost,
-            heartbeat=self.heartbeat_timeout,
-            channel_max=self.channel_max)
+            connection_attempts=reconnect_attempts,
+            retry_delay=retry_delay,
+            blocked_connection_timeout=blocked_connection_timeout,
+            socket_timeout=timeout,
+            virtual_host=vhost,
+            heartbeat=heartbeat_timeout,
+            channel_max=channel_max)
 
 
 class ExchangeTypes(object):
@@ -159,6 +165,8 @@ class SharedConnection(pika.BlockingConnection):
         """Constructor."""
         self._connection_params = connection_params
         self._pika_connection = None
+        super(SharedConnection,
+              self).__init__(parameters=self._connection_params)
 
 
 class AMQPTransportSync(object):
@@ -187,6 +195,7 @@ class AMQPTransportSync(object):
         else:
             # Default Connection Parameters
             self.connection_params = ConnectionParameters()
+        self.connection_params.credentials = self.credentials
 
         if 'connection' in kwargs:
             self._connection = kwargs.pop('connection')
@@ -213,41 +222,19 @@ class AMQPTransportSync(object):
         if self._connection is not None:
             self.logger.warn(
                 'Using allready existing connection [{}]'.format(''))
-            self._connection.channel()
+            self._channel = self._connection.channel()
             return True
-        host = self.connection_params.host
-        port = self.connection_params.port
-        vhost = self.connection_params.vhost
-        reconnect_attempts = self.connection_params.reconnect_attempts
-        timeout = self.connection_params.timeout
-        blocked_connection_timeout = \
-            self.connection_params.blocked_connection_timeout
-        retry_delay = self.connection_params.retry_delay
-        # Meh, no secure at the moment, TODO!
-        #  secure = self.connection_params.secure
-        heartbeat = self.connection_params.heartbeat_timeout
-
-        self._connect_params = pika.ConnectionParameters(
-            host=host,
-            port=port,
-            credentials=self.credentials,
-            connection_attempts=reconnect_attempts,
-            retry_delay=retry_delay,
-            blocked_connection_timeout=blocked_connection_timeout,
-            socket_timeout=timeout,
-            virtual_host=vhost,
-            heartbeat=heartbeat)
-
         try:
             # Create a new connection
-            self._connection = pika.BlockingConnection(self._connect_params)
+            self._connection = SharedConnection(self.connection_params)
             self._channel = self._connection.channel()
         except Exception as exc:
             self.logger.exception('')
             raise (exc)
             return False
         self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
-            host, port, vhost))
+            self.connection_params.host, self.connection_params.port,
+            self.connection_params.vhost))
         return True
 
     def create_exchange(self, exchange_name, exchange_type):
