@@ -106,7 +106,7 @@ class SubscriberSync(AMQPTransportSync):
                  on_message=None,
                  exchange='amq.topic',
                  queue_size=10,
-                 queue_ttl=60000,
+                 message_ttl=60000,
                  overflow='drop-head',
                  *args,
                  **kwargs):
@@ -128,7 +128,7 @@ class SubscriberSync(AMQPTransportSync):
         self._topic_exchange = exchange
         self._queue_name = None
         self._queue_size = queue_size
-        self._queue_ttl = queue_ttl
+        self._message_ttl = message_ttl
         self._overflow = overflow
         self.connect()
         if on_message is not None:
@@ -137,7 +137,7 @@ class SubscriberSync(AMQPTransportSync):
         # Create a queue
         self._queue_name = self.create_queue(
             queue_size=self._queue_size,
-            queue_ttl=self._queue_ttl,
+            message_ttl=self._message_ttl,
             overflow_behaviour=self._overflow)
         # Bind queue to the Topic exchange
         self.bind_queue(self._topic_exchange, self._queue_name, self._topic)

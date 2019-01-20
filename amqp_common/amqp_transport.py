@@ -262,8 +262,9 @@ class AMQPTransportSync(object):
                      queue_name='',
                      exclusive=True,
                      queue_size=10,
-                     queue_ttl=60000,
-                     overflow_behaviour='drop-head'):
+                     message_ttl=60000,
+                     overflow_behaviour='drop-head',
+                     expires=10000):
         """
         Create a new queue.
 
@@ -278,18 +279,25 @@ class AMQPTransportSync(object):
         @param queue_size: The size of the queue
         @type queue_size: int
 
-        @param queue_ttl: Per-queue message time-to-live
-            (https://www.rabbitmq.com/ttl.html)
-        @type queue_ttl: int
+        @param message_ttl: Per-queue message time-to-live
+            (https://www.rabbitmq.com/ttl.html#per-queue-message-ttl)
+        @type message_ttl: int
 
         @param overflow_behaviour: Overflow behaviour - 'drop-head' ||
             'reject-publish'
         @type overflow_behaviour: str
+
+        @param expires: Queues will expire after a period of time only
+            when they are not used (e.g. do not have consumers).
+            This feature can be used together with the auto-delete
+            queue property. The value is expressed in milliseconds (ms).
+            https://www.rabbitmq.com/ttl.html#queue-ttl
         """
         args = {
             'x-max-length': queue_size,
             'x-overflow': overflow_behaviour,
-            'x-message-ttl': queue_ttl
+            'x-message-ttl': message_ttl,
+            'x-expires': expires
         }
 
         result = self._channel.queue_declare(
@@ -300,7 +308,7 @@ class AMQPTransportSync(object):
             arguments=args)
         queue_name = result.method.queue
         self.logger.debug('Created queue [{}] [size={}, ttl={}]'.format(
-            queue_name, queue_size, queue_ttl))
+            queue_name, queue_size, message_ttl))
         return queue_name
 
     def queue_exists(self, queue_name):
