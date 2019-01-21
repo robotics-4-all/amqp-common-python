@@ -115,7 +115,7 @@ class ConnectionParameters(pika.ConnectionParameters):
 
         super(ConnectionParameters, self).__init__(
             host=host,
-            port=port,
+            port=str(port),
             credentials=creds,
             connection_attempts=reconnect_attempts,
             retry_delay=retry_delay,
@@ -185,11 +185,17 @@ class AMQPTransportSync(object):
         else:
             self.debug = False
 
+        if 'creds' in kwargs:
+            self.credentials = kwargs.pop('creds')
+        else:
+            self.credentials = Credentials()
+
         if 'connection_params' in kwargs:
             self.connection_params = kwargs.pop('connection_params')
         else:
             # Default Connection Parameters
             self.connection_params = ConnectionParameters()
+            self.connection_params.credentials = self.credentials
 
         if 'connection' in kwargs:
             self._connection = kwargs.pop('connection')
