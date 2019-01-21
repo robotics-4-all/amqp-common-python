@@ -237,6 +237,14 @@ class AMQPTransportSync(object):
             self.connection_params.vhost))
         return True
 
+    def close(self):
+        self.logger.debug('Invoking a graceful shutdown of the' +
+                          'channel with the AMQP Broker...')
+        self._channel.stop_consuming()
+        self._channel.close()
+        self.logger.debug('Channel closed')
+        return True
+
     def create_exchange(self, exchange_name, exchange_type):
         """
         Create a new exchange.
@@ -332,13 +340,6 @@ class AMQPTransportSync(object):
                 exchange=exchange_name, queue=queue_name, routing_key=bind_key)
         except Exception:
             self.logger.exception()
-
-    def __del__(self):
-        """Destructor."""
-        try:
-            self._connection.close()
-        except Exception:
-            pass
 
 
 class BrokerInterfaceAsync(object):

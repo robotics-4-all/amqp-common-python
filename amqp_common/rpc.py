@@ -92,6 +92,16 @@ class RpcServer(AMQPTransportSync):
         """
         return json.loads(data)
 
+    def close(self):
+        if self._channel.is_closed:
+            self.logger.info('Invoked close() on an already closed channel')
+            return False
+        self._channel.queue_delete(queue=self._rpc_queue)
+        super(RpcServer, self).close()
+
+    def __del__(self):
+        self.close()
+
 
 class RpcClient(AMQPTransportSync):
     def __init__(self, rpc_name, *args, **kwargs):
@@ -184,7 +194,6 @@ class RpcClient(AMQPTransportSync):
             return resp
         except Exception:
             pass
-        print(type(data))
         resp = data.decode()
         return resp
 
