@@ -313,6 +313,9 @@ class AMQPTransportSync(object):
             queue_name, queue_size, message_ttl))
         return queue_name
 
+    def delete_queue(self, queue_name):
+        self._channel.queue_delete(queue=self._queue_name)
+
     def queue_exists(self, queue_name):
         """
         TODO.
