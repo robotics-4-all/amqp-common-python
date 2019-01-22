@@ -149,7 +149,7 @@ class SubscriberSync(AMQPTransportSync):
 
     @property
     def hz(self):
-        """Incoming mesasge frequency."""
+        """Incoming message frequency."""
         return self._hz
 
     def run(self):
@@ -162,10 +162,19 @@ class SubscriberSync(AMQPTransportSync):
         self.loop_thread.daemon = True
         self.loop_thread.start()
 
-    def _consume(self):
+    def close(self):
+        if self._channel.is_closed:
+            self.logger.info('Invoked close() on an already closed channel')
+            return False
+        self.delete_queue(self._queue_name)
+        super(SubscriberSync, self).close()
+
+    def _consume(self, reliable=False):
         """Start AMQP consumer (aka Subscriber)."""
         self._channel.basic_consume(
-            self._on_msg_callback_wrapper, queue=self._queue_name, no_ack=True)
+            self._on_msg_callback_wrapper,
+            queue=self._queue_name,
+            no_ack=(not reliable))
         try:
             self._channel.start_consuming()
         except KeyboardInterrupt as exc:

@@ -94,9 +94,9 @@ class RpcServer(AMQPTransportSync):
 
     def close(self):
         if self._channel.is_closed:
-            self.logger.info('Invoked close() on an already closed channel')
+            self.logger.warning('Invoked close() on an already closed channel')
             return False
-        self._channel.queue_delete(queue=self._rpc_queue)
+        self.delete_queue(self._rpc_queue)
         super(RpcServer, self).close()
 
     def __del__(self):

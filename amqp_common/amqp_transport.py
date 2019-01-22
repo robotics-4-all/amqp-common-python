@@ -220,8 +220,8 @@ class AMQPTransportSync(object):
     def connect(self):
         """Connect to the AMQP broker. Creates a new channel."""
         if self._connection is not None:
-            self.logger.warn(
-                'Using allready existing connection [{}]'.format(''))
+            self.logger.debug('Using allready existing connection [{}]'.format(
+                self._connection))
             self._channel = self._connection.channel()
             return True
         try:
@@ -314,7 +314,7 @@ class AMQPTransportSync(object):
         return queue_name
 
     def delete_queue(self, queue_name):
-        self._channel.queue_delete(queue=self._queue_name)
+        self._channel.queue_delete(queue=queue_name)
 
     def queue_exists(self, queue_name):
         """
