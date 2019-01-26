@@ -4,16 +4,19 @@
 from __future__ import print_function
 
 import sys
+import time
 import argparse
 
 import amqp_common
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='AMQP RPC Client CLI.')
-    parser.add_argument('rpc', action='store', help='RPC name to call.')
-
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='AMQP SharedConnection CLI.')
     parser.add_argument(
-        '--hz', dest='hz', help='Publishing frequency', type=int, default=2)
+        '--iterations',
+        dest='iterations',
+        help='Iterations to run',
+        type=int,
+        default=10)
     parser.add_argument(
         '--host',
         dest='host',
@@ -53,22 +56,33 @@ if __name__ == "__main__":
     vhost = args.vhost
     username = args.username
     password = args.password
-    rpc_name = args.rpc
-    hz = args.hz
+    iterations = args.iterations
     debug = True if args.debug else False
+
+    data = {'a': 10, 'b': 20}
 
     conn_params = amqp_common.ConnectionParameters(
         host=host, port=port, vhost=vhost)
+
     conn_params.credentials = amqp_common.Credentials(username, password)
     conn = amqp_common.SharedConnection(conn_params)
 
-    rpc_client = amqp_common.RpcClient(rpc_name, connection=conn)
+    print('----- RPC Server ------')
+    rpc_name = 'rpc-test'
+    for i in range(iterations):
+        rpc_server = amqp_common.RpcServer(
+            rpc_name, connection=conn, debug=debug)
+        rpc_server.run_threaded()
+        time.sleep(1)
+        rpc_server.close()
+        del rpc_server
 
-    data = {'a': 4, 'b': 13}
-
-    rpc_client.debug = True
-    rate = amqp_common.Rate(hz)
-    while True:
-        resp = rpc_client.call(data)
-        print(resp)
-        rate.sleep()
+    print('----- Subscriber------')
+    topic_name = 'test'
+    for i in range(iterations):
+        sub = amqp_common.SubscriberSync(
+            topic_name, connection=conn, debug=debug)
+        sub.run_threaded()
+        time.sleep(1)
+        sub.close()
+        del sub

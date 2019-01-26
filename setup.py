@@ -18,9 +18,9 @@ def read(fname):
 setup(
     install_requires=read('requirements.txt').splitlines(),
     name='amqp_common',
-    version='0.6.0',
-    description='',
-    url='',
+    version='0.8.0',
+    description='RPC and PubSub implementation in python over AMQP. A thin layer above pika.',
+    url='https://github.com/robotics-4-all/amqp-common-python/',
     download_url='',
     author='Konstantinos Panayiotou',
     author_email='klpanagi@gmail.com',

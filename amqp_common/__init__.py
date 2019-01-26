@@ -1,19 +1,12 @@
 from __future__ import absolute_import
 
-
-from .publisher import PublisherSync
-from .subscriber import SubscriberSync
-from .rpc_client import RpcClient
-from .rpc_server import RpcServer
-from .broker_interface import Credentials, ConnectionParameters
+from .pubsub import PublisherSync, SubscriberSync
+from .rpc import RpcClient, RpcServer
+from .amqp_transport import Credentials, ConnectionParameters, SharedConnection
 from .timer import Timer
+from .rate import Rate
 
 __all__ = [
-    'PublisherSync',
-    'SubscriberSync',
-    'RpcClient',
-    'RpcServer',
-    'Credentials',
-    'ConnectionParameters',
-    'Timer'
+    'PublisherSync', 'SubscriberSync', 'RpcClient', 'RpcServer', 'Credentials',
+    'ConnectionParameters', 'Timer', 'SharedConnection', 'Rate'
 ]

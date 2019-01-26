@@ -3,55 +3,101 @@
 
 from __future__ import absolute_import
 
+import time
+
 import pika
 #  import ssl
 
 from .r4a_logger import create_logger, LoggingLevel
 
 
-class ConnectionParameters(object):
+class MessageProperties(pika.BasicProperties):
+    def __init__(self,
+                 content_type=None,
+                 content_encoding=None,
+                 timestamp=None,
+                 correlation_id=None,
+                 reply_to=None):
+        """Message Properties/Attribures used for sending and receiving messages.
+
+        @param content_type:
+
+        @param content_encoding:
+
+        @param timestamp
+
+        """
+        if timestamp is None:
+            timestamp = long((time.time() + 0.5) * 1000)
+        super(MessageProperties, self).__init__(
+            content_type=content_type,
+            content_encoding=content_encoding,
+            timestamp=timestamp,
+            correlation_id=correlation_id,
+            reply_to=reply_to)
+
+
+class ConnectionParameters(pika.ConnectionParameters):
     """AMQP Connection parameters."""
 
     __slots__ = [
         'host', 'port', 'secure', 'vhost', 'reconnect_attempts', 'retry_delay',
-        'timeout', 'heartbeat'
+        'timeout', 'heartbeat_timeout', 'blocked_connection_timeout', 'creds'
     ]
 
     def __init__(self,
                  host='127.0.0.1',
                  port='5672',
+                 creds=None,
                  secure=False,
                  vhost='/',
                  reconnect_attempts=5,
                  retry_delay=2.0,
-                 timeout=10.0,
+                 timeout=120,
                  blocked_connection_timeout=None,
-                 heartbeat=120):
+                 heartbeat_timeout=60,
+                 channel_max=128):
         """
         Constructor.
 
-        @param host: Hostname of AMQP broker
+        @param host: Hostname of AMQP broker to connect to.
         @type host: string
 
-        @param port: AMQP broker listening port
+        @param port: AMQP broker listening port.
         @type port: string
 
-        @param secure: Enable SSL/TLS - AMQPS
+        @param creds: AUth Credentials.
+        @type creds: Credentials
+
+        @param secure: Enable SSL/TLS (AMQPS) - Not used!!
         @type secure: boolean
 
         @param reconnect_attempts: TODO
         @type reconnect_attempts: int
 
-        @param retry_delay: Time delay between reconnect attempts
+        @param retry_delay: Time delay between reconnect attempts.
         @type retry_delay: float
 
-        @param timeout: Connection timeout value.
+        @param timeout: Socket Connection timeout value.
         @type timeout: float
 
-        @param heartbeat: Set time period for sending heartbeat packages.
-            Heartbeat packages denote that the connection is alive in
-            both ends. Value is set in seconds.
-        @type heartbeat: int
+        @param timeout: Blocked Connection timeout value.
+            Set the timeout, in seconds, that the connection may remain blocked
+            (triggered by Connection.Blocked from broker). If the timeout expires
+            before connection becomes unblocked, the connection will be torn down.
+        @type timeout: float
+
+        @param heartbeat_timeout: Controls AMQP heartbeat timeout negotiation
+            during connection tuning. An integer value always overrides the value
+            proposed by broker. Use 0 to deactivate heartbeats and None to always
+            accept the broker's proposal. The value passed for timeout is also
+            used to calculate an interval at which a heartbeat frame is sent to
+            the broker. The interval is equal to the timeout value divided by two.
+        @type heartbeat_timeout: int
+
+        @param channel_max: The max permissible number of channels per connection.
+            Defaults to 128
+        @type channel_max: int
         """
         self.host = host
         self.port = port
@@ -61,7 +107,23 @@ class ConnectionParameters(object):
         self.retry_delay = retry_delay
         self.timeout = timeout
         self.blocked_connection_timeout = blocked_connection_timeout
-        self.heartbeat = heartbeat
+        self.heartbeat_timeout = heartbeat_timeout
+        self.channel_max = channel_max
+
+        if creds is None:
+            creds = Credentials()
+
+        super(ConnectionParameters, self).__init__(
+            host=host,
+            port=str(port),
+            credentials=creds,
+            connection_attempts=reconnect_attempts,
+            retry_delay=retry_delay,
+            blocked_connection_timeout=blocked_connection_timeout,
+            socket_timeout=timeout,
+            virtual_host=vhost,
+            heartbeat=heartbeat_timeout,
+            channel_max=channel_max)
 
 
 class ExchangeTypes(object):
@@ -75,8 +137,10 @@ class ExchangeTypes(object):
     Default = ''
 
 
-class Credentials(object):
-    """Connection credentials for authn/authz."""
+class Credentials(pika.PlainCredentials):
+    """Connection credentials for authn/authz.
+    TODO: Inherit from pika.PlainCredentials
+    """
 
     __slots__ = ['username', 'password']
 
@@ -91,19 +155,21 @@ class Credentials(object):
         @type password: string
 
         """
-        self.username = username
-        self.password = password
+        super(Credentials, self).__init__(username=username, password=password)
 
 
-class SharedConnection(object):
+class SharedConnection(pika.BlockingConnection):
     """Shared Connection."""
 
-    def __init__(self):
+    def __init__(self, connection_params):
         """Constructor."""
-        pass
+        self._connection_params = connection_params
+        self._pika_connection = None
+        super(SharedConnection,
+              self).__init__(parameters=self._connection_params)
 
 
-class BrokerInterfaceSync(object):
+class AMQPTransportSync(object):
     """Broker Interface."""
 
     def __init__(self, *args, **kwargs):
@@ -119,22 +185,22 @@ class BrokerInterfaceSync(object):
         else:
             self.debug = False
 
-        if 'creds' in kwargs:
-            self.credentials = kwargs.pop('creds')
-        else:
-            self.credentials = Credentials()
-
         if 'connection_params' in kwargs:
             self.connection_params = kwargs.pop('connection_params')
         else:
             # Default Connection Parameters
             self.connection_params = ConnectionParameters()
 
+        if 'creds' in kwargs:
+            self.credentials = kwargs.pop('creds')
+            self.connection_params.credentials = self.credentials
+        else:
+            self.credentials = self.connection_params.credentials
+
         if 'connection' in kwargs:
             self._connection = kwargs.pop('connection')
-
-        self._creds_pika = pika.PlainCredentials(self.credentials.username,
-                                                 self.credentials.password)
+        else:
+            self._connection = None
 
     @property
     def debug(self):
@@ -152,45 +218,34 @@ class BrokerInterfaceSync(object):
             self.logger.setLevel(LoggingLevel.INFO)
 
     def connect(self):
-        """Connect to the AMQP broker."""
-        host = self.connection_params.host
-        port = self.connection_params.port
-        vhost = self.connection_params.vhost
-        reconnect_attempts = self.connection_params.reconnect_attempts
-        timeout = self.connection_params.timeout
-        blocked_connection_timeout = self.connection_params.blocked_connection_timeout
-        retry_delay = self.connection_params.retry_delay
-        # Meh, no secure at the moment, TODO!
-        secure = self.connection_params.secure
-        heartbeat = self.connection_params.heartbeat
-
-        self._connect_params = pika.ConnectionParameters(
-            host=host,
-            port=port,
-            credentials=self._creds_pika,
-            connection_attempts=reconnect_attempts,
-            retry_delay=retry_delay,
-            blocked_connection_timeout=blocked_connection_timeout,
-            socket_timeout=timeout,
-            virtual_host=vhost,
-            heartbeat=heartbeat)
-
+        """Connect to the AMQP broker. Creates a new channel."""
+        if self._connection is not None:
+            self.logger.debug('Using allready existing connection [{}]'.format(
+                self._connection))
+            self._channel = self._connection.channel()
+            return True
         try:
-            if self._connection is None:
-                # Create a new connection
-                self._connection = pika.BlockingConnection(
-                    self._connect_params)
+            # Create a new connection
+            self._connection = SharedConnection(self.connection_params)
             self._channel = self._connection.channel()
         except Exception as exc:
             self.logger.exception('')
-            raise exc
+            raise (exc)
             return False
-        self.logger.info('Connected to AMQP broker @ [{}:{}]'.format(
-            host, port))
-        self.logger.info('Vhost -> {}'.format(vhost))
+        self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
+            self.connection_params.host, self.connection_params.port,
+            self.connection_params.vhost))
         return True
 
-    def setup_exchange(self, exchange_name, exchange_type):
+    def close(self):
+        self.logger.debug('Invoking a graceful shutdown of the' +
+                          'channel with the AMQP Broker...')
+        self._channel.stop_consuming()
+        self._channel.close()
+        self.logger.debug('Channel closed')
+        return True
+
+    def create_exchange(self, exchange_name, exchange_type):
         """
         Create a new exchange.
 
@@ -209,12 +264,11 @@ class BrokerInterfaceSync(object):
                      queue_name='',
                      exclusive=True,
                      queue_size=10,
-                     queue_ttl=60000,
-                     overflow_behaviour='drop-head'):
+                     message_ttl=60000,
+                     overflow_behaviour='drop-head',
+                     expires=600000):
         """
         Create a new queue.
-
-        - Overflow Behaviours: https://www.rabbitmq.com/maxlength.html#overflow-behaviour
 
         @param queue_name: The name of the queue.
         @type queue_name: string
@@ -225,18 +279,27 @@ class BrokerInterfaceSync(object):
         @param queue_size: The size of the queue
         @type queue_size: int
 
-        @param queue_ttl: Per-queue message time-to-live
-            (https://www.rabbitmq.com/ttl.html)
-        @type queue_ttl: int
+        @param message_ttl: Per-queue message time-to-live
+            (https://www.rabbitmq.com/ttl.html#per-queue-message-ttl)
+        @type message_ttl: int
 
         @param overflow_behaviour: Overflow behaviour - 'drop-head' ||
-            'reject-publish'
+            'reject-publish'.
+            https://www.rabbitmq.com/maxlength.html#overflow-behaviour
         @type overflow_behaviour: str
+
+        @param expires: Queues will expire after a period of time only
+            when they are not used (e.g. do not have consumers).
+            This feature can be used together with the auto-delete
+            queue property. The value is expressed in milliseconds (ms).
+            Default value is 10 minutes.
+            https://www.rabbitmq.com/ttl.html#queue-ttl
         """
         args = {
             'x-max-length': queue_size,
             'x-overflow': overflow_behaviour,
-            'x-message-ttl': queue_ttl
+            'x-message-ttl': message_ttl,
+            'x-expires': expires
         }
 
         result = self._channel.queue_declare(
@@ -247,8 +310,11 @@ class BrokerInterfaceSync(object):
             arguments=args)
         queue_name = result.method.queue
         self.logger.debug('Created queue [{}] [size={}, ttl={}]'.format(
-            queue_name, queue_size, queue_ttl))
+            queue_name, queue_size, message_ttl))
         return queue_name
+
+    def delete_queue(self, queue_name):
+        self._channel.queue_delete(queue=queue_name)
 
     def queue_exists(self, queue_name):
         """
@@ -277,13 +343,6 @@ class BrokerInterfaceSync(object):
                 exchange=exchange_name, queue=queue_name, routing_key=bind_key)
         except Exception:
             self.logger.exception()
-
-    def __del__(self):
-        """Destructor."""
-        try:
-            self._connection.close()
-        except Exception:
-            pass
 
 
 class BrokerInterfaceAsync(object):

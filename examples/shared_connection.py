@@ -3,17 +3,19 @@
 
 from __future__ import print_function
 
-import sys
+import time
 import argparse
 
 import amqp_common
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='AMQP RPC Client CLI.')
-    parser.add_argument('rpc', action='store', help='RPC name to call.')
-
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='AMQP SharedConnection CLI.')
     parser.add_argument(
-        '--hz', dest='hz', help='Publishing frequency', type=int, default=2)
+        '--hz',
+        dest='hz',
+        help='Publishing frequency',
+        type=float,
+        default=1.0)
     parser.add_argument(
         '--host',
         dest='host',
@@ -40,6 +42,11 @@ if __name__ == "__main__":
         help='Authentication password',
         default='b0t')
     parser.add_argument(
+        '--channels',
+        dest='num_channels',
+        help='Number of channels to open.',
+        default=9)
+    parser.add_argument(
         '--debug',
         dest='debug',
         help='Enable debugging',
@@ -48,27 +55,44 @@ if __name__ == "__main__":
         nargs='?')
 
     args = parser.parse_args()
+    hz = args.hz
     host = args.host
     port = args.port
     vhost = args.vhost
     username = args.username
     password = args.password
-    rpc_name = args.rpc
-    hz = args.hz
+    topic = 'test'
     debug = True if args.debug else False
+    num_channels = args.num_channels
+
+    data = {'a': 10, 'b': 20}
 
     conn_params = amqp_common.ConnectionParameters(
         host=host, port=port, vhost=vhost)
     conn_params.credentials = amqp_common.Credentials(username, password)
     conn = amqp_common.SharedConnection(conn_params)
 
-    rpc_client = amqp_common.RpcClient(rpc_name, connection=conn)
+    pubs = []
+    rpc_servers = []
+    rpc_clients = []
+    for i in range(int(num_channels / 3)):
+        pub = amqp_common.PublisherSync(topic, connection=conn, debug=debug)
+        rpc_name = 'rpc-' + str(long(time.time() * 1000))
+        rpc_server = amqp_common.RpcServer(
+            rpc_name, connection_params=conn_params, debug=debug)
+        rpc_server.run_threaded()
+        rpc_client = amqp_common.RpcClient(
+            rpc_name, connection=conn, debug=debug)
 
-    data = {'a': 4, 'b': 13}
+        pubs.append(pub)
+        rpc_servers.append(rpc_server)
+        rpc_clients.append(rpc_client)
 
-    rpc_client.debug = True
-    rate = amqp_common.Rate(hz)
+    rate = amqp_common.Rate(int(hz))
     while True:
-        resp = rpc_client.call(data)
-        print(resp)
+        for p in pubs:
+            p.publish(data)
+        for c in rpc_clients:
+            resp = c.call(data)
+            print('RESPONSE: {}'.format(resp))
         rate.sleep()
