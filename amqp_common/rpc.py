@@ -3,6 +3,8 @@
 
 from __future__ import absolute_import
 
+import functools
+
 from threading import Thread
 
 import uuid
@@ -29,8 +31,17 @@ class RpcServer(AMQPTransportSync):
         self._exchange = exchange
         # Bind on_request callback
         self.on_request = on_request
-        self._rpc_queue = self.create_queue(rpc_name)
+
+        self._rpc_queue = self.create_queue(self._rpc_name)
         self._channel.basic_qos(prefetch_count=1)
+
+    def is_alive(self):
+        if self.connection is None:
+            return False
+        elif self.connection.is_open:
+            return True
+        else:
+            return False
 
     def run(self):
         """."""
@@ -39,11 +50,21 @@ class RpcServer(AMQPTransportSync):
         self.logger.info('[x] - Awaiting RPC requests')
         self._channel.start_consuming()
 
+    def process_requests(self):
+        self.connection.process_data_events()
+
     def run_threaded(self):
         """Run RPC Server in a separate thread."""
-        self.loop_thread = Thread(target=self.run)
-        self.loop_thread.daemon = True
-        self.loop_thread.start()
+        #  self.loop_thread = Thread(target=self.run)
+        #  self.loop_thread.daemon = True
+        #  self.loop_thread.start()
+        #  self.add_callback_thread_safe(self.run)
+        self.connection.add_callback_threadsafe(functools.partial(self.run))
+
+    def run_async(self):
+        self._channel.basic_consume(
+            self._on_request_wrapper, queue=self._rpc_queue)
+        self.logger.info('[x] - Awaiting RPC requests')
 
     def _on_request_wrapper(self, ch, method, properties, body):
         self.logger.debug(
