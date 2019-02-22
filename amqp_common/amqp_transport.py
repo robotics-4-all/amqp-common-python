@@ -177,6 +177,7 @@ class AMQPTransportSync(object):
         self._connection = None
         self._channel = None
         self._closing = False
+        self._debug = False
         self.logger = create_logger('{}-{}'.format(self.__class__.__name__,
                                                    self._name))
 
@@ -199,8 +200,14 @@ class AMQPTransportSync(object):
 
         if 'connection' in kwargs:
             self._connection = kwargs.pop('connection')
-        else:
-            self._connection = None
+
+    @property
+    def channel(self):
+        return self._channel
+
+    @property
+    def connection(self):
+        return self._connection
 
     @property
     def debug(self):
@@ -235,15 +242,14 @@ class AMQPTransportSync(object):
         self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
             self.connection_params.host, self.connection_params.port,
             self.connection_params.vhost))
-        return True
+        return self._channel
 
     def close(self):
         self.logger.debug('Invoking a graceful shutdown of the' +
                           'channel with the AMQP Broker...')
         self._channel.stop_consuming()
         self._channel.close()
-        self.logger.debug('Channel closed')
-        return True
+        self.logger.debug('Channel closed!')
 
     def create_exchange(self, exchange_name, exchange_type):
         """
