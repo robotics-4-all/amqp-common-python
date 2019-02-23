@@ -238,7 +238,6 @@ class AMQPTransportSync(object):
         except Exception as exc:
             self.logger.exception('')
             raise (exc)
-            return False
         self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
             self.connection_params.host, self.connection_params.port,
             self.connection_params.vhost))
@@ -261,10 +260,13 @@ class AMQPTransportSync(object):
         @param exchange_type: The type of the exchange (e.g. 'topic').
         @type exchange_type: string
         """
-        self.logger.debug('Declaring exchange: [name={}, type={}]'.format(
-            exchange_name, exchange_type))
         self._channel.exchange_declare(
-            exchange=exchange_name, exchange_type=exchange_type, passive=True)
+            exchange=exchange_name,
+            exchange_type=exchange_type,
+            passive=True)
+
+        self.logger.debug('Created exchange: [name={}, type={}]'.format(
+            exchange_name, exchange_type))
 
     def create_queue(self,
                      queue_name='',
