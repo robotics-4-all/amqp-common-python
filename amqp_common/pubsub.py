@@ -3,6 +3,7 @@
 
 from __future__ import absolute_import
 
+import functools
 from threading import Thread, Semaphore
 from collections import deque
 import json
@@ -53,13 +54,18 @@ class PublisherSync(AMQPTransportSync):
         msg_props = MessageProperties(
             content_type=content_type,
             content_encoding=content_encoding,
-            timestamp=long((time.time() + 0.5) * 1000))
+            timestamp=int((time.time() + 0.5) * 1000))
+
+        self.connection.add_callback_threadsafe(
+            functools.partial(self._pub, msg, msg_props))
 
         self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
+
+    def _pub(self, msg, props):
         self._channel.basic_publish(
             exchange=self._topic_exchange,
             routing_key=self._topic,
-            properties=msg_props,
+            properties=props,
             body=self._serialize_data(msg))
 
     def pub_loop(self, data_bind, hz):
