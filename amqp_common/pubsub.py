@@ -188,7 +188,11 @@ class SubscriberSync(AMQPTransportSync):
             self.logger.error(exc, exc_info=True)
 
     def _on_msg_callback_wrapper(self, ch, method, properties, body):
-        msg = self._deserialize_data(body)
+        try:
+            msg = self._deserialize_data(body)
+        except Exception as e:
+            self.logger.warning('Could not deserialize data: ', body)
+            return
 
         self._sem.acquire()
         self._calc_msg_frequency()
