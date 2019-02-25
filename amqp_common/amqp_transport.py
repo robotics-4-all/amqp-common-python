@@ -4,6 +4,8 @@
 from __future__ import absolute_import
 
 import time
+import atexit
+import signal
 
 import pika
 #  import ssl
@@ -201,6 +203,12 @@ class AMQPTransportSync(object):
         if 'connection' in kwargs:
             self._connection = kwargs.pop('connection')
 
+        # So that connections do not go zombie due to high
+        # heartbeat timeout value
+        atexit.register(self.close)
+        signal.signal(signal.SIGTERM, self.close)
+        signal.signal(signal.SIGINT, self.close)
+
     @property
     def channel(self):
         return self._channel
@@ -351,6 +359,9 @@ class AMQPTransportSync(object):
                 exchange=exchange_name, queue=queue_name, routing_key=bind_key)
         except Exception:
             self.logger.exception()
+
+    def __del__(self):
+        self.close()
 
 
 class BrokerInterfaceAsync(object):
