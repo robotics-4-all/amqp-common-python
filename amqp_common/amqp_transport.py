@@ -203,11 +203,10 @@ class AMQPTransportSync(object):
         if 'connection' in kwargs:
             self._connection = kwargs.pop('connection')
 
-        # So that connections do not go zombie due to high
-        # heartbeat timeout value
-        atexit.register(self.close)
-        signal.signal(signal.SIGTERM, self.close)
-        signal.signal(signal.SIGINT, self.close)
+        # So that connections do not go zombie
+        atexit.register(self._graceful_shutdown)
+        #  signal.signal(signal.SIGTERM, self._signal_handler)
+        #  signal.signal(signal.SIGINT, self._signal_handler)
 
     @property
     def channel(self):
@@ -251,7 +250,14 @@ class AMQPTransportSync(object):
             self.connection_params.vhost))
         return self._channel
 
-    def close(self):
+    def _signal_handler(self, signum, frame):
+        #  self.logger.info('Signal received: ', signum)
+        self._graceful_shutdown()
+
+    def _graceful_shutdown(self):
+        if self._channel.is_closed:
+            self.logger.warning('Channel is allready closed')
+            return
         self.logger.debug('Invoking a graceful shutdown of the' +
                           'channel with the AMQP Broker...')
         self._channel.stop_consuming()
@@ -361,7 +367,7 @@ class AMQPTransportSync(object):
             self.logger.exception()
 
     def __del__(self):
-        self.close()
+        self._graceful_shutdown()
 
 
 class BrokerInterfaceAsync(object):
