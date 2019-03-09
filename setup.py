@@ -18,8 +18,10 @@ def read(fname):
 setup(
     install_requires=read('requirements.txt').splitlines(),
     name='amqp_common',
-    version='0.8.0',
-    description='RPC and PubSub implementation in python over AMQP. A thin layer above pika.',
+    version='0.8.1',
+    description=
+        'RPC and PubSub implementation in python over AMQP.' +
+        'Thin wrapper arround Pika',
     url='https://github.com/robotics-4-all/amqp-common-python/',
     download_url='',
     author='Konstantinos Panayiotou',
@@ -39,5 +41,4 @@ setup(
     # A script(s) to be installed into standard locations like /usr/bin
     scripts=[],
     zip_safe=True,
-    long_description=read('README.md') if os.path.exists('README.md') else ""
-)
+    long_description=read('README.md') if os.path.exists('README.md') else "")
