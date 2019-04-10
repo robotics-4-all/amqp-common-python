@@ -2,6 +2,9 @@
 
 # amqp-common-python
 Higher-level features for AMQP, such as PubSub and RPC (server-client).
+Thing wrapper around [pika](https://pika.readthedocs.io/en/stable/).
+
+**ATTENTION**: Works with pika<=0.13. DOES NOT WORK WITH PIKA 1.0
 
 # Installation
 
