@@ -178,9 +178,10 @@ class SubscriberSync(AMQPTransportSync):
     def _consume(self, reliable=False):
         """Start AMQP consumer (aka Subscriber)."""
         self._channel.basic_consume(
+            self._queue_name,
             self._on_msg_callback_wrapper,
-            queue=self._queue_name,
-            no_ack=(not reliable))
+            exclusive=False,
+            auto_ack=(not reliable))
         try:
             self._channel.start_consuming()
         except KeyboardInterrupt as exc:
@@ -190,8 +191,9 @@ class SubscriberSync(AMQPTransportSync):
     def _on_msg_callback_wrapper(self, ch, method, properties, body):
         try:
             msg = self._deserialize_data(body)
-        except Exception as e:
-            self.logger.warning('Could not deserialize data: ', body)
+        except Exception:
+            self.logger.error("Could not deserialize data", exc_info=True)
+            # Do not invoke the onmessage callback
             return
 
         self._sem.acquire()

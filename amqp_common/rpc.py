@@ -33,7 +33,7 @@ class RpcServer(AMQPTransportSync):
         self.on_request = on_request
 
         self._rpc_queue = self.create_queue(self._rpc_name)
-        self._channel.basic_qos(prefetch_count=1)
+        self._channel.basic_qos(prefetch_count=1, global_qos=False)
 
     def is_alive(self):
         if self.connection is None:
@@ -46,7 +46,8 @@ class RpcServer(AMQPTransportSync):
     def run(self):
         """."""
         self._channel.basic_consume(
-            self._on_request_wrapper, queue=self._rpc_queue)
+            self._rpc_queue,
+            self._on_request_wrapper)
         self.logger.info('[x] - Awaiting RPC requests')
         self._channel.start_consuming()
 
@@ -141,7 +142,9 @@ class RpcClient(AMQPTransportSync):
         self._exchange = ExchangeTypes.Default
 
         self._channel.basic_consume(
-            self._on_response, no_ack=True, queue='amq.rabbitmq.reply-to')
+            self._on_response,
+            auto_ack=True,
+            queue='amq.rabbitmq.reply-to')
 
     def _on_response(self, ch, method, props, body):
         """Handle on-response event."""

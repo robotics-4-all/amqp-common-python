@@ -18,7 +18,7 @@ def read(fname):
 setup(
     install_requires=read('requirements.txt').splitlines(),
     name='amqp_common',
-    version='0.8.1',
+    version='0.8.3',
     description=
         'RPC and PubSub implementation in python over AMQP.' +
         'Thin wrapper arround Pika',

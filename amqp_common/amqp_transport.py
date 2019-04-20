@@ -30,7 +30,7 @@ class MessageProperties(pika.BasicProperties):
 
         """
         if timestamp is None:
-            timestamp = long((time.time() + 0.5) * 1000)
+            timestamp = int((time.time() + 0.5) * 1000)
         super(MessageProperties, self).__init__(
             content_type=content_type,
             content_encoding=content_encoding,
@@ -251,7 +251,7 @@ class AMQPTransportSync(object):
         return self._channel
 
     def _signal_handler(self, signum, frame):
-        #  self.logger.info('Signal received: ', signum)
+        self.logger.info('Signal received: ', signum)
         self._graceful_shutdown()
 
     def _graceful_shutdown(self):
