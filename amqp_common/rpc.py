@@ -5,14 +5,10 @@ from __future__ import absolute_import
 
 import functools
 
-from threading import Thread
-
 import uuid
 import json
 
-import pika
-
-from .amqp_transport import (AMQPTransportSync, Credentials, ExchangeTypes,
+from .amqp_transport import (AMQPTransportSync, ExchangeTypes,
                              MessageProperties)
 
 
@@ -45,10 +41,7 @@ class RpcServer(AMQPTransportSync):
 
     def run(self):
         """."""
-        self._channel.basic_consume(
-            self._rpc_queue,
-            self._on_request_wrapper)
-        self.logger.info('[x] - Awaiting RPC requests')
+        self._consume()
         self._channel.start_consuming()
 
     def process_requests(self):
@@ -63,8 +56,12 @@ class RpcServer(AMQPTransportSync):
         self.connection.add_callback_threadsafe(functools.partial(self.run))
 
     def run_async(self):
+        self._consume()
+
+    def _consume(self):
         self._channel.basic_consume(
-            self._on_request_wrapper, queue=self._rpc_queue)
+            self._rpc_queue,
+            self._on_request_wrapper)
         self.logger.info('[x] - Awaiting RPC requests')
 
     def _on_request_wrapper(self, ch, method, properties, body):
@@ -142,9 +139,9 @@ class RpcClient(AMQPTransportSync):
         self._exchange = ExchangeTypes.Default
 
         self._channel.basic_consume(
+            'amq.rabbitmq.reply-to',
             self._on_response,
-            auto_ack=True,
-            queue='amq.rabbitmq.reply-to')
+            auto_ack=True)
 
     def _on_response(self, ch, method, props, body):
         """Handle on-response event."""
