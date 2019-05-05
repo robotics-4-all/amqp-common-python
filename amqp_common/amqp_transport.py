@@ -370,7 +370,7 @@ class AMQPTransportSync(object):
         self._graceful_shutdown()
 
 
-class BrokerInterfaceAsync(object):
+class AMQPTransportAsync(object):
     CONNECTION_TIMEOUT_SEC = 5
 
     def __init__(self, host='127.0.0.1', port='5672', exchange='amq.topic'):
@@ -381,7 +381,7 @@ class BrokerInterfaceAsync(object):
         self._exchange = 'amq.topic'
         self._host = host
         self._port = port
-        super(BrokerInterfaceAsync, self).__init__()
+        super(AMQPTransportAsync, self).__init__()
 
     def connect(self):
         """This method connects to RabbitMQ, returning the connection handle.
