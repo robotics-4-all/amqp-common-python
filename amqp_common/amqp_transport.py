@@ -394,8 +394,11 @@ class AMQPTransportAsync(object):
             self._host, self._port))
         connection = pika.SelectConnection(
             pika.URLParameters(host=self.host, port=self.port),
-            self.on_connection_open,
+            on_open_callback=self.on_connection_open,
+            on_open_error_callback=self.on_connection_open_error,
+            on_close_callback=self.on_connection_closed,
             stop_ioloop_on_close=False)
+        self._connection = connection
         return connection
 
     def on_connection_open(self, unused_connection):
@@ -408,7 +411,6 @@ class AMQPTransportAsync(object):
 
         """
         self.logger.info('Connection established!')
-        self.add_on_connection_close_callback()
         self.open_channel()
 
     def add_on_connection_close_callback(self):
@@ -440,6 +442,15 @@ class AMQPTransportAsync(object):
             self._connection.add_timeout(self.CONNECTION_TIMEOUT_SEC,
                                          self.reconnect)
 
+    def on_connection_open_error(self, _unused_connection, err):
+        """This method is called by pika if the connection to RabbitMQ
+        can't be established.
+        :param pika.SelectConnection _unused_connection: The connection
+        :param Exception err: The error
+        """
+        self.logger.info('Connection open failed: %s', err)
+        self.reconnect()
+
     def reconnect(self):
         """
         Will be invoked by the IOLoop timer if the connection is
@@ -465,7 +476,7 @@ class AMQPTransportAsync(object):
         self.logger.info('Creating a new channel')
         self._connection.channel(on_open_callback=self.on_channel_open)
 
-    def _on_channel_open(self, channel):
+    def on_channel_open(self, channel):
         """This method is invoked by pika when the channel has been opened.
         The channel object is passed in so we can make use of it.
 
@@ -479,8 +490,6 @@ class AMQPTransportAsync(object):
         self._channel = channel
         self.add_on_channel_close_callback()
 
-    def on_channel_open(self, channel):
-        pass
 
     def add_on_channel_close_callback(self):
         """This method tells pika to call the on_channel_closed method if
@@ -506,7 +515,7 @@ class AMQPTransportAsync(object):
                             reply_code, reply_text)
         self._connection.close()
 
-    def create_exchange(self, exchange_name, exchange_type):
+    def create_exchange(self, exchange_name, exchange_type, on_declareok):
         """
         Declare/Create an exchange.
 
@@ -517,13 +526,15 @@ class AMQPTransportAsync(object):
         @type exchange_type:
         """
         self.logger.debug('Declaring exchange {} [type={}]', exchange_name,
-                          exchange_type)
+                exchange_type)
+        cb = functools.partial(
+            on_declareok, userdata=exchange_name)
         self._channel.exchange_declare(
-            self.on_exchange_declareok,
             exchange=exchange_name,
-            exchange_type=exchange_type)
+            exchange_type=exchange_type,
+            callback=cb)
 
-    def _create_queue(self, queue_name=''):
+    def create_queue(self, queue_name=''):
         result = self._channel.queue_declare(exclusive=True, queue=queue_name)
         queue_name = result.method.queue
         self._queue_name = queue_name
@@ -536,6 +547,15 @@ class AMQPTransportAsync(object):
                 exchange=exchange_name, queue=queue_name, routing_key=bind_key)
         except Exception:
             self.logger.exception()
+
+    def set_qos(self, on_ok):
+        """This method sets up the consumer prefetch to only be delivered
+        one message at a time. The consumer must acknowledge this message
+        before RabbitMQ will deliver another one. You should experiment
+        with different prefetch values to achieve desired performance.
+        """
+        self._channel.basic_qos(
+            prefetch_count=self._prefetch_count, callback=on_ok)
 
     def __del__(self):
         self._connection.close()
