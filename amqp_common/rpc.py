@@ -7,6 +7,7 @@ import functools
 
 import uuid
 import json
+import threading
 
 from .amqp_transport import (AMQPTransportSync, ExchangeTypes,
                              MessageProperties)
@@ -46,14 +47,20 @@ class RpcServer(AMQPTransportSync):
 
     def process_requests(self):
         self.connection.process_data_events()
+        # self.connection.add_callback_threadsafe(
+        #         functools.partial(self.connection.process_data_events))
 
     def run_threaded(self):
         """Run RPC Server in a separate thread."""
-        #  self.loop_thread = Thread(target=self.run)
-        #  self.loop_thread.daemon = True
-        #  self.loop_thread.start()
-        #  self.add_callback_thread_safe(self.run)
-        self.connection.add_callback_threadsafe(functools.partial(self.run))
+        self.loop_thread = threading.Thread(target=self.run)
+        self.loop_thread.daemon = True
+        self.loop_thread.start()
+        # self.connection.add_callback_threadsafe(
+        #         functools.partial(self._consume))
+        # self.connection.add_callback_threadsafe(
+        #         functools.partial(self._channel.start_consuming))
+        # self.connection.add_callback_threadsafe(
+        #         functools.partial(self.run))
 
     def run_async(self):
         self._consume()
@@ -169,7 +176,7 @@ class RpcClient(AMQPTransportSync):
             self._channel.basic_publish(
                 exchange=self._exchange,
                 routing_key=self._rpc_name,
-                immediate=immediate,
+                mandatory=False,
                 properties=rpc_props,
                 body=self._serialize_data(msg))
 
