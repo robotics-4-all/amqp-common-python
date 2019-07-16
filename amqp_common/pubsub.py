@@ -30,7 +30,7 @@ class PublisherSync(AMQPTransportSync):
         self.connect()
         self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
 
-    def publish(self, msg, thread_safe=False):
+    def publish(self, msg, thread_safe=True):
         """
         Publish message once.
         TODO: 1) Add message publishing timestamp
@@ -64,14 +64,16 @@ class PublisherSync(AMQPTransportSync):
                 functools.partial(self._pub, msg, msg_props))
         else:
             self._pub(msg, msg_props)
+        self.connection.sleep(0.0001)
 
     def _pub(self, msg, props):
-        self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
         self._channel.basic_publish(
             exchange=self._topic_exchange,
             routing_key=self._topic,
             properties=props,
             body=self._serialize_data(msg))
+        self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
+
 
     def pub_loop(self, data_bind, hz):
         """
