@@ -64,7 +64,9 @@ class PublisherSync(AMQPTransportSync):
                 functools.partial(self._pub, msg, msg_props))
         else:
             self._pub(msg, msg_props)
-        self.connection.sleep(0.0001)
+        # self.connection.add_callback_threadsafe(
+        #     functools.partial(self.connection.process_data_events))
+        self.connection.process_data_events()
 
     def _pub(self, msg, props):
         self._channel.basic_publish(
