@@ -130,9 +130,6 @@ class ConnectionParameters(pika.ConnectionParameters):
 
 class ExchangeTypes(object):
     """AMQP Exchange Types."""
-
-    __slots__ = ['Topic', 'Direct', 'Fanout', 'Default']
-
     Topic = 'topic'
     Direct = 'direct'
     Fanout = 'fanout'
