@@ -43,7 +43,10 @@ class RpcServer(AMQPTransportSync):
     def run(self):
         """."""
         self._consume()
-        self._channel.start_consuming()
+        try:
+            self._channel.start_consuming()
+        except Exception as exc:
+            self.logger.error(exc)
 
     def process_requests(self):
         self.connection.process_data_events()
