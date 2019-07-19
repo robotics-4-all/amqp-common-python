@@ -57,7 +57,7 @@ class PublisherSync(AMQPTransportSync):
         msg_props = MessageProperties(
             content_type=content_type,
             content_encoding=content_encoding,
-            timestamp=int((time.time() + 0.5) * 1000))
+            timestamp=(1.0 * (time.time() + 0.5) * 1000))
 
         if thread_safe:
             self.connection.add_callback_threadsafe(

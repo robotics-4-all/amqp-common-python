@@ -30,7 +30,7 @@ class MessageProperties(pika.BasicProperties):
 
         """
         if timestamp is None:
-            timestamp = int((time.time() + 0.5) * 1000)
+            timestamp = (time.time() + 0.5) * 1000
         super(MessageProperties, self).__init__(
             content_type=content_type,
             content_encoding=content_encoding,
