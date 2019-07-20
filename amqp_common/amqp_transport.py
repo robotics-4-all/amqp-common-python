@@ -31,6 +31,7 @@ class MessageProperties(pika.BasicProperties):
         """
         if timestamp is None:
             timestamp = (time.time() + 0.5) * 1000
+        timestamp = int(timestamp)
         super(MessageProperties, self).__init__(
             content_type=content_type,
             content_encoding=content_encoding,
@@ -177,8 +178,13 @@ class AMQPTransportSync(object):
         self._channel = None
         self._closing = False
         self._debug = False
-        self.logger = create_logger('{}-{}'.format(self.__class__.__name__,
-                                                   self._name))
+        self.logger = None
+
+        if 'logger' in kwargs:
+            self.logger = kwargs.pop('logger')
+        else:
+            self.logger = create_logger('{}-{}'.format(
+                self.__class__.__name__, self._name))
 
         if 'debug' in kwargs:
             self.debug = kwargs.pop('debug')

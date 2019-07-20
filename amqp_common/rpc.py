@@ -46,7 +46,7 @@ class RpcServer(AMQPTransportSync):
         try:
             self._channel.start_consuming()
         except Exception as exc:
-            self.logger.error(exc)
+            self.logger.error(exc, exc_info=True)
 
     def process_requests(self):
         self.connection.process_data_events()
@@ -89,6 +89,8 @@ class RpcServer(AMQPTransportSync):
         except Exception as e:
             self.logger.exception('')
             resp = {'error': str(e)}
+        if resp is None:
+            resp = {}
         resp_serial = self._serialize_data(resp)
 
         msg_props = MessageProperties(correlation_id=properties.correlation_id)
