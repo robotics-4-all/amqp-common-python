@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import time
+from os import path
 import json
 import base64
 
@@ -74,3 +75,4 @@ class FileMessage(Message):
             fdata = f.read()
             b64 = base64.b64encode(fdata)
             self.data = b64
+            self.filename = path.basename(filepath)
