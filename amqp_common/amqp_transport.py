@@ -239,18 +239,26 @@ class AMQPTransportSync(object):
         if self._connection is not None:
             self.logger.debug('Using allready existing connection [{}]'.format(
                 self._connection))
+            # Create a new communication channel
             self._channel = self._connection.channel()
             return True
         try:
             # Create a new connection
             self._connection = SharedConnection(self.connection_params)
+            # Create a new communication channel
             self._channel = self._connection.channel()
+            self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
+                self.connection_params.host, self.connection_params.port,
+                self.connection_params.vhost))
+        except pika.exceptions.ConnectionClosed:
+            self.logger.debug('Connection timed out. Reconnecting...')
+            return self.connect()
+        except pika.exceptions.AMQPConnectionError:
+            self.logger.debug('Connection error. Reconnecting...')
+            return self.connect()
         except Exception as exc:
             self.logger.exception('')
             raise (exc)
-        self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
-            self.connection_params.host, self.connection_params.port,
-            self.connection_params.vhost))
         return self._channel
 
     def _signal_handler(self, signum, frame):
@@ -258,6 +266,8 @@ class AMQPTransportSync(object):
         self._graceful_shutdown()
 
     def _graceful_shutdown(self):
+        if not self.connection:
+            return
         if self._channel.is_closed:
             self.logger.warning('Channel is allready closed')
             return

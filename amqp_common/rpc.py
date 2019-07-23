@@ -50,7 +50,7 @@ class RpcServer(AMQPTransportSync):
 
     def process_requests(self):
         self.connection.process_data_events()
-        # self.connection.add_callback_threadsafe(
+        # self.conection.add_callback_threadsafe(
         #         functools.partial(self.connection.process_data_events))
 
     def run_threaded(self):
@@ -124,6 +124,8 @@ class RpcServer(AMQPTransportSync):
         return json.loads(data)
 
     def close(self):
+        if not self._channel:
+            return
         if self._channel.is_closed:
             self.logger.warning('Invoked close() on an already closed channel')
             return False
