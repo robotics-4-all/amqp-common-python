@@ -40,6 +40,11 @@ if __name__ == "__main__":
         help='Authentication password',
         default='b0t')
     parser.add_argument(
+        '--timeout',
+        dest='timeout',
+        help='Response Timeout value',
+        default=20)
+    parser.add_argument(
         '--debug',
         dest='debug',
         help='Enable debugging',
@@ -54,6 +59,7 @@ if __name__ == "__main__":
     username = args.username
     password = args.password
     rpc_name = args.rpc
+    timeout = args.timeout
     hz = args.hz
     debug = True if args.debug else False
 
@@ -67,8 +73,13 @@ if __name__ == "__main__":
     data = {'a': 4, 'b': 13}
 
     rpc_client.debug = True
+    if hz == 0:
+        resp = rpc_client.call(data, timeout=timeout)
+        print(resp)
+        sys.exit(0)
+
     rate = amqp_common.Rate(hz)
     while True:
-        resp = rpc_client.call(data)
+        resp = rpc_client.call(data, timeout=timeout)
         print(resp)
         rate.sleep()
