@@ -244,6 +244,11 @@ class AMQPTransportSync(object):
             return True
         try:
             # Create a new connection
+            self.logger.info(
+                    'Connecting to AMQP broker @ [{}:{}, vhost={}]...'.format(
+                        self.connection_params.host,
+                        self.connection_params.port,
+                        self.connection_params.vhost))
             self._connection = SharedConnection(self.connection_params)
             # Create a new communication channel
             self._channel = self._connection.channel()
