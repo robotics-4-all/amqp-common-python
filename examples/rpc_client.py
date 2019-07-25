@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import sys
 import argparse
+import json
 
 import amqp_common
 
@@ -45,6 +46,11 @@ if __name__ == "__main__":
         help='Response Timeout value',
         default=20)
     parser.add_argument(
+        '--msg',
+        dest='msg',
+        help='Message to send',
+        default='{}')
+    parser.add_argument(
         '--debug',
         dest='debug',
         help='Enable debugging',
@@ -61,6 +67,7 @@ if __name__ == "__main__":
     rpc_name = args.rpc
     timeout = args.timeout
     hz = args.hz
+    msg = args.msg
     debug = True if args.debug else False
 
     conn_params = amqp_common.ConnectionParameters(
@@ -70,16 +77,16 @@ if __name__ == "__main__":
 
     rpc_client = amqp_common.RpcClient(rpc_name, connection=conn)
 
-    data = {'a': 4, 'b': 13}
+    msg = json.loads(msg)
 
     rpc_client.debug = True
     if hz == 0:
-        resp = rpc_client.call(data, timeout=timeout)
+        resp = rpc_client.call(msg, timeout=timeout)
         print(resp)
         sys.exit(0)
 
     rate = amqp_common.Rate(hz)
     while True:
-        resp = rpc_client.call(data, timeout=timeout)
+        resp = rpc_client.call(msg, timeout=timeout)
         print(resp)
         rate.sleep()
