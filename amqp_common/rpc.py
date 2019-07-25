@@ -72,13 +72,9 @@ class RpcServer(AMQPTransportSync):
         self._channel.basic_consume(
             self._rpc_queue,
             self._on_request_wrapper)
-        self.logger.info('[x] - Awaiting RPC requests')
+        self.logger.info('[x] - RPC Endpoint ready: {}'.format(self._rpc_name))
 
     def _on_request_wrapper(self, ch, method, properties, body):
-        self.logger.debug(
-            'Received Request:' + '\n- [*] Method: %s' +
-            '\n- [*] Properties: %s' + '\n- [*] Channel: %s', method,
-            properties, ch)
         try:
             msg = self._deserialize_data(body)
             meta = {'channel': ch, 'method': method, 'properties': properties}

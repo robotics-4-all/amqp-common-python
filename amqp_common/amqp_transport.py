@@ -6,6 +6,7 @@ from __future__ import absolute_import
 import time
 import atexit
 import signal
+import json
 
 import pika
 #  import ssl
@@ -128,6 +129,21 @@ class ConnectionParameters(pika.ConnectionParameters):
             heartbeat=heartbeat_timeout,
             channel_max=channel_max)
 
+    def __str__(self):
+        _properties = {
+            'host': self.host,
+            'port': self.port,
+            'vhost': self.vhost,
+            'reconnect_attempts': self.reconnect_attempts,
+            'retry_delay': self.retry_delay,
+            'timeout': self.timeout,
+            'blocked_connection_timeout': self.blocked_connection_timeout,
+            'heartbeat_timeout': self.heartbeat_timeout,
+            'channel_max': self.channel_max
+        }
+        _str = json.dumps(_properties)
+        return _str
+
 
 class ExchangeTypes(object):
     """AMQP Exchange Types."""
@@ -244,17 +260,21 @@ class AMQPTransportSync(object):
             return True
         try:
             # Create a new connection
-            self.logger.info(
+            self.logger.debug(
                     'Connecting to AMQP broker @ [{}:{}, vhost={}]...'.format(
                         self.connection_params.host,
                         self.connection_params.port,
                         self.connection_params.vhost))
+            self.logger.debug('Connection parameters:')
+            self.logger.debug(self.connection_params)
             self._connection = SharedConnection(self.connection_params)
             # Create a new communication channel
             self._channel = self._connection.channel()
-            self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
-                self.connection_params.host, self.connection_params.port,
-                self.connection_params.vhost))
+            self.logger.info(
+                    'Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
+                        self.connection_params.host,
+                        self.connection_params.port,
+                        self.connection_params.vhost))
         except pika.exceptions.ConnectionClosed:
             self.logger.debug('Connection timed out. Reconnecting...')
             return self.connect()
