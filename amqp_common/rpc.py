@@ -69,7 +69,7 @@ class RpcServer(AMQPTransportSync):
         self._consume()
 
     def _consume(self):
-        self._channel.basic_consume(
+        self.consumer_tag = self._channel.basic_consume(
             self._rpc_queue,
             self._on_request_wrapper)
         self.logger.info('[x] - RPC Endpoint ready: {}'.format(self._rpc_name))
@@ -123,12 +123,20 @@ class RpcServer(AMQPTransportSync):
         if not self._channel:
             return
         if self._channel.is_closed:
-            self.logger.warning('Invoked close() on an already closed channel')
+            self.logger.warning('Channel was already closed!')
             return False
+        self._channel.stop_consuming()
+        # super(RpcServer, self).close()
         self.delete_queue(self._rpc_queue)
-        super(RpcServer, self).close()
+        return True
+
+    def stop(self):
+        return self.close()
 
     def __del__(self):
+        self.close()
+
+    def __exit__(self, exc_type, value, traceback):
         self.close()
 
 
@@ -148,9 +156,11 @@ class RpcClient(AMQPTransportSync):
         self._response = None
         self._exchange = ExchangeTypes.Default
 
-        self._channel.basic_consume(
+        self._consumer_tag = self._channel.basic_consume(
             'amq.rabbitmq.reply-to',
             self._on_response,
+            exclusive=False,
+            consumer_tag=None,
             auto_ack=True)
 
     def _on_response(self, ch, method, props, body):

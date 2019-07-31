@@ -296,8 +296,7 @@ class AMQPTransportSync(object):
         if self._channel.is_closed:
             self.logger.warning('Channel is allready closed')
             return
-        self.logger.debug('Invoking a graceful shutdown of the' +
-                          'channel with the AMQP Broker...')
+        self.logger.debug('Invoking a graceful shutdown...')
         self._channel.stop_consuming()
         self._channel.close()
         self.logger.debug('Channel closed!')
