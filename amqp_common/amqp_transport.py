@@ -6,6 +6,7 @@ from __future__ import absolute_import
 import time
 import atexit
 import signal
+import json
 
 import pika
 #  import ssl
@@ -30,7 +31,8 @@ class MessageProperties(pika.BasicProperties):
 
         """
         if timestamp is None:
-            timestamp = int((time.time() + 0.5) * 1000)
+            timestamp = (time.time() + 0.5) * 1000
+        timestamp = int(timestamp)
         super(MessageProperties, self).__init__(
             content_type=content_type,
             content_encoding=content_encoding,
@@ -127,6 +129,21 @@ class ConnectionParameters(pika.ConnectionParameters):
             heartbeat=heartbeat_timeout,
             channel_max=channel_max)
 
+    def __str__(self):
+        _properties = {
+            'host': self.host,
+            'port': self.port,
+            'vhost': self.vhost,
+            'reconnect_attempts': self.reconnect_attempts,
+            'retry_delay': self.retry_delay,
+            'timeout': self.timeout,
+            'blocked_connection_timeout': self.blocked_connection_timeout,
+            'heartbeat_timeout': self.heartbeat_timeout,
+            'channel_max': self.channel_max
+        }
+        _str = json.dumps(_properties)
+        return _str
+
 
 class ExchangeTypes(object):
     """AMQP Exchange Types."""
@@ -177,8 +194,13 @@ class AMQPTransportSync(object):
         self._channel = None
         self._closing = False
         self._debug = False
-        self.logger = create_logger('{}-{}'.format(self.__class__.__name__,
-                                                   self._name))
+        self.logger = None
+
+        if 'logger' in kwargs:
+            self.logger = kwargs.pop('logger')
+        else:
+            self.logger = create_logger('{}-{}'.format(
+                self.__class__.__name__, self._name))
 
         if 'debug' in kwargs:
             self.debug = kwargs.pop('debug')
@@ -233,18 +255,35 @@ class AMQPTransportSync(object):
         if self._connection is not None:
             self.logger.debug('Using allready existing connection [{}]'.format(
                 self._connection))
+            # Create a new communication channel
             self._channel = self._connection.channel()
             return True
         try:
             # Create a new connection
+            self.logger.debug(
+                    'Connecting to AMQP broker @ [{}:{}, vhost={}]...'.format(
+                        self.connection_params.host,
+                        self.connection_params.port,
+                        self.connection_params.vhost))
+            self.logger.debug('Connection parameters:')
+            self.logger.debug(self.connection_params)
             self._connection = SharedConnection(self.connection_params)
+            # Create a new communication channel
             self._channel = self._connection.channel()
+            self.logger.info(
+                    'Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
+                        self.connection_params.host,
+                        self.connection_params.port,
+                        self.connection_params.vhost))
+        except pika.exceptions.ConnectionClosed:
+            self.logger.debug('Connection timed out. Reconnecting...')
+            return self.connect()
+        except pika.exceptions.AMQPConnectionError:
+            self.logger.debug('Connection error. Reconnecting...')
+            return self.connect()
         except Exception as exc:
             self.logger.exception('')
             raise (exc)
-        self.logger.info('Connected to AMQP broker @ [{}:{}, vhost={}]'.format(
-            self.connection_params.host, self.connection_params.port,
-            self.connection_params.vhost))
         return self._channel
 
     def _signal_handler(self, signum, frame):
@@ -252,11 +291,12 @@ class AMQPTransportSync(object):
         self._graceful_shutdown()
 
     def _graceful_shutdown(self):
+        if not self.connection:
+            return
         if self._channel.is_closed:
             self.logger.warning('Channel is allready closed')
             return
-        self.logger.debug('Invoking a graceful shutdown of the' +
-                          'channel with the AMQP Broker...')
+        self.logger.debug('Invoking a graceful shutdown...')
         self._channel.stop_consuming()
         self._channel.close()
         self.logger.debug('Channel closed!')
