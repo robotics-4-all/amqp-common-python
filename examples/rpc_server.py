@@ -37,7 +37,7 @@ if __name__ == "__main__":
         '--vhost',
         dest='vhost',
         help='Virtual host to connect to.',
-        default='/klpanagi')
+        default='/')
     parser.add_argument(
         '--username',
         dest='username',
