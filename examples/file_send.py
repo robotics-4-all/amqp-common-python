@@ -65,10 +65,9 @@ if __name__ == "__main__":
 
     rpc_client = amqp_common.RpcClient(rpc_name, connection=conn)
 
-    fmsg = amqp_common.FileMessage()
-    fmsg.load_from_file(fpath)
-    data = fmsg.serialize()
+    msg = amqp_common.FileMessage()
+    msg.load_from_file(fpath)
 
     rpc_client.debug = True
-    resp = rpc_client.call(data)
+    resp = rpc_client.call(msg)
     print('[*] - Response:\n{}'.format(resp))

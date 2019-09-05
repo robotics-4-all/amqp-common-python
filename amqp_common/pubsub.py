@@ -13,6 +13,8 @@ from .amqp_transport import (AMQPTransportSync, Credentials, ExchangeTypes,
                              MessageProperties)
 from .rate import Rate
 
+from .msg import Message
+
 
 class PublisherSync(AMQPTransportSync):
     def __init__(self, topic, exchange='amq.topic', *args, **kwargs):
@@ -42,15 +44,17 @@ class PublisherSync(AMQPTransportSync):
 
         """
         content_type = None
-        if isinstance(msg, dict):
-            content_type = 'application/json'
-            content_encoding = 'utf8'
-        elif isinstance(msg, str):
-            content_type = 'text/plain'
-            content_encoding = 'utf8'
-        if isinstance(msg, bytes):
-            content_type = 'application/octet-stream'
-            content_encoding = 'utf8'
+        if not isinstance(msg, Message):
+            raise TypeError('msg parameter must be of type <Message>')
+        # elif isinstance(msg, dict):
+        #     content_type = 'application/json'
+        #     content_encoding = 'utf8'
+        # elif isinstance(msg, str):
+        #     content_type = 'text/plain'
+        #     content_encoding = 'utf8'
+        # elif isinstance(msg, bytes):
+        #     content_type = 'application/octet-stream'
+        #     content_encoding = 'utf8'
         #  elif isinstance(msg, unicode):
         #  content_type = 'text/plain'
 
@@ -61,19 +65,19 @@ class PublisherSync(AMQPTransportSync):
 
         if thread_safe:
             self.connection.add_callback_threadsafe(
-                functools.partial(self._pub, msg, msg_props))
+                functools.partial(self._send_message, msg, msg_props))
         else:
-            self._pub(msg, msg_props)
+            self._send_message(msg, msg_props)
         # self.connection.add_callback_threadsafe(
         #     functools.partial(self.connection.process_data_events))
         self.connection.process_data_events()
 
-    def _pub(self, msg, props):
+    def _send_message(self, msg, props):
         self._channel.basic_publish(
             exchange=self._topic_exchange,
             routing_key=self._topic,
             properties=props,
-            body=self._serialize_data(msg))
+            body=msg.serialize_json())
         self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
 
 
@@ -102,13 +106,6 @@ class PublisherSync(AMQPTransportSync):
             except KeyboardInterrupt:
                 self.logger.exception('Process received keyboard interrupt')
                 break
-
-    def _serialize_data(self, data):
-        """
-        TODO: Make Class. Allow different implementation of serialization
-            classes.
-        """
-        return json.dumps(data)
 
 
 class SubscriberSync(AMQPTransportSync):

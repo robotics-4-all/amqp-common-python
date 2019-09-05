@@ -15,13 +15,18 @@ class Message(object):
             if hasattr(self.req, key):
                 setattr(self.req, key, value)
             else:
-                raise AttributeError(''.join(self.__class__.__name__ +
-                    ' object does not have a property named ' + str(key)))
+                raise AttributeError(
+                        '{}{}{}'.join(
+                            self.__class__.__name__,
+                            ' object does not have a property named ',
+                            str(key))
+                        )
 
     def _to_dict(self):
         """Serialize message object to a dict."""
         _d = {}
         for k in self.__slots__:
+            # Recursive object seriazilation to dictionary
             if not k.startswith('_'):
                 _prop = getattr(self, k)
                 if isinstance(_prop, Message):
@@ -38,8 +43,17 @@ class Message(object):
     def serialize_json(self):
         return json.dumps(self._to_dict())
 
-    def serialize(self):
+    def serialize_bytes(self):
+        return json.dumps(self._to_dict()).encode('utf-8')
+
+    def to_dict(self):
         return self._to_dict()
+
+    def _deserialize_from_json_string(self, data_str):
+        try:
+            return json.loads(data_str)
+        except Exception:
+            print('Could not deserialize json string data!!')
 
     def __eq__(self, other):
         """! Equality method """

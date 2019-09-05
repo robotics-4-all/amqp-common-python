@@ -12,6 +12,8 @@ import threading
 from .amqp_transport import (AMQPTransportSync, ExchangeTypes,
                              MessageProperties)
 
+from .msg import Message
+
 
 class RpcServer(AMQPTransportSync):
     def __init__(self, rpc_name, exchange='', on_request=None, *args,
@@ -107,7 +109,7 @@ class RpcServer(AMQPTransportSync):
         @param data: Data to serialize.
         @type data: dict|int|bool
         """
-        return json.dumps(data)
+        return data.serialize_json()
 
     def _deserialize_data(self, data):
         """
@@ -178,8 +180,7 @@ class RpcClient(AMQPTransportSync):
 
     def call(self, msg, background=False, immediate=False, timeout=5.0):
         """Call RPC."""
-        if not self._validate_data(msg):
-            raise TypeError('Should be of type dict')
+        self._validate_data(msg)
         self._response = None
         self._corr_id = self.gen_corr_id()
         try:
@@ -217,7 +218,7 @@ class RpcClient(AMQPTransportSync):
         TODO: Make Class. Allow different implementation of serialization
             classes.
         """
-        return json.dumps(data)
+        return data.serialize_json()
 
     def _deserialize_data(self, data):
         """
@@ -242,7 +243,7 @@ class RpcClient(AMQPTransportSync):
         """
         Dummy at the moment. Only check if it is of type dictionary.
         """
-        if isinstance(data, dict):
-            return True
+        if not isinstance(data, Message):
+            raise TypeError('Should be of type <Message>')
         else:
             return False
