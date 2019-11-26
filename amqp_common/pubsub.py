@@ -12,12 +12,15 @@ import time
 from .amqp_transport import (AMQPTransportSync, Credentials, ExchangeTypes,
                              MessageProperties)
 from .rate import Rate
-
 from .msg import Message
+from .serializer import JSONSerializer
 
 
 class PublisherSync(AMQPTransportSync):
-    def __init__(self, topic, exchange='amq.topic', *args, **kwargs):
+    Serializer = JSONSerializer
+
+    def __init__(self, topic, exchange='amq.topic', serializer=None,
+                 *args, **kwargs):
         """
         Constructor.
 
@@ -28,6 +31,8 @@ class PublisherSync(AMQPTransportSync):
         self._topic_exchange = exchange
         self._topic = topic
         self._name = topic
+        if serializer is not None:
+            self.Serializer = serializer
         AMQPTransportSync.__init__(self, *args, **kwargs)
         self.connect()
         self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
@@ -44,14 +49,18 @@ class PublisherSync(AMQPTransportSync):
 
         """
         content_type = None
-        if not isinstance(msg, Message):
-            raise TypeError('msg parameter must be of type <Message>')
-        # elif isinstance(msg, dict):
-        #     content_type = 'application/json'
-        #     content_encoding = 'utf8'
-        # elif isinstance(msg, str):
-        #     content_type = 'text/plain'
-        #     content_encoding = 'utf8'
+        if isinstance(msg, Message):
+            content_type = 'application/json'
+            content_encoding = 'utf8'
+            data = self.Serializer.serialize(msg)
+        if isinstance(msg, dict):
+            content_type = 'application/json'
+            content_encoding = 'utf8'
+            data = json.dumps(msg)
+        elif isinstance(msg, str):
+            content_type = 'text/plain'
+            content_encoding = 'utf8'
+            data = msg
         # elif isinstance(msg, bytes):
         #     content_type = 'application/octet-stream'
         #     content_encoding = 'utf8'
@@ -65,21 +74,21 @@ class PublisherSync(AMQPTransportSync):
 
         if thread_safe:
             self.connection.add_callback_threadsafe(
-                functools.partial(self._send_message, msg, msg_props))
+                functools.partial(self._send_data, data, msg_props))
         else:
-            self._send_message(msg, msg_props)
+            self._send_data(data, msg_props)
         # self.connection.add_callback_threadsafe(
         #     functools.partial(self.connection.process_data_events))
         self.connection.process_data_events()
 
-    def _send_message(self, msg, props):
+    def _send_data(self, data, props):
+        self.logger.debug('Sending message to topic <{}>'.format(self._topic))
         self._channel.basic_publish(
             exchange=self._topic_exchange,
             routing_key=self._topic,
             properties=props,
-            body=msg.serialize_json())
-        self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
-
+            body=data)
+        # self.logger.debug('[x] - Sent %r:%r' % (self._topic, data))
 
     def pub_loop(self, data_bind, hz):
         """
@@ -198,9 +207,10 @@ class SubscriberSync(AMQPTransportSync):
         try:
             msg = self._deserialize_data(body)
         except Exception:
-            self.logger.error("Could not deserialize data", exc_info=True)
-            # Do not invoke the onmessage callback
-            return
+            self.logger.error("Could not deserialize (json) data",
+                              exc_info=True)
+            # Return data as is. Let callback handle with encoding...
+            msg = body
 
         self._sem.acquire()
         self._calc_msg_frequency()
