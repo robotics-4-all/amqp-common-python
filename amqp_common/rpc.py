@@ -109,7 +109,8 @@ class RpcServer(AMQPTransportSync):
         @param data: Data to serialize.
         @type data: dict|int|bool
         """
-        return data.serialize_json()
+        return json.dumps(data)
+        # return data.serialize_json()
 
     def _deserialize_data(self, data):
         """

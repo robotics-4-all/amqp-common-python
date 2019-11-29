@@ -41,7 +41,9 @@ class Message(object):
             setattr(self, key, val)
 
     def serialize_json(self):
-        return json.dumps(self._to_dict())
+        _d = self._to_dict()
+        print(_d)
+        return json.dumps(_d)
 
     def serialize_bytes(self):
         return json.dumps(self._to_dict()).encode('utf-8')
@@ -88,5 +90,5 @@ class FileMessage(Message):
         with open(filepath, 'rb') as f:
             fdata = f.read()
             b64 = base64.b64encode(fdata)
-            self.data = b64
+            self.data = b64.decode()
             self.filename = path.basename(filepath)
