@@ -403,6 +403,9 @@ class AMQPTransportSync(object):
         except Exception:
             self.logger.exception()
 
+    def close(self):
+        self._graceful_shutdown()
+
     def __del__(self):
         self._graceful_shutdown()
 
