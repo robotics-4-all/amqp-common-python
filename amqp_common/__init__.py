@@ -6,9 +6,11 @@ from .amqp_transport import Credentials, ConnectionParameters, SharedConnection
 from .timer import Timer
 from .rate import Rate
 from .msg import Message, HeaderMessage, FileMessage
+from .events import Event, EventEmitterOptions, EventEmitter
 
 __all__ = [
     'PublisherSync', 'SubscriberSync', 'RpcClient', 'RpcServer', 'Credentials',
     'ConnectionParameters', 'Timer', 'SharedConnection', 'Rate', 'Message',
-    'HeaderMessage', 'FileMessage'
+    'HeaderMessage', 'FileMessage', 'Event', 'EventEmitter',
+    'EventEmitterOptions'
 ]
