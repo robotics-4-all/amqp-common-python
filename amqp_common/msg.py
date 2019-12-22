@@ -42,7 +42,6 @@ class Message(object):
 
     def serialize_json(self):
         _d = self._to_dict()
-        print(_d)
         return json.dumps(_d)
 
     def serialize_bytes(self):
