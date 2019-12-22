@@ -67,7 +67,8 @@ if __name__ == "__main__":
 
     msg = amqp_common.FileMessage()
     msg.load_from_file(fpath)
+    data = msg.serialize_json()
 
-    rpc_client.debug = True
-    resp = rpc_client.call(msg)
+    rpc_client.debug = debug
+    resp = rpc_client.call(data)
     print('[*] - Response:\n{}'.format(resp))
