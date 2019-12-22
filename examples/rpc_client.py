@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
@@ -89,4 +89,5 @@ if __name__ == "__main__":
     while True:
         resp = rpc_client.call(msg, timeout=timeout)
         print(resp)
+        print("----------> Call execution time: {}".format(rpc_client.delay))
         rate.sleep()

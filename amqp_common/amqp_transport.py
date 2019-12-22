@@ -20,7 +20,10 @@ class MessageProperties(pika.BasicProperties):
                  content_encoding=None,
                  timestamp=None,
                  correlation_id=None,
-                 reply_to=None):
+                 reply_to=None,
+                 message_id=None,
+                 user_id=None,
+                 app_id=None):
         """Message Properties/Attribures used for sending and receiving messages.
 
         @param content_type:
@@ -38,7 +41,11 @@ class MessageProperties(pika.BasicProperties):
             content_encoding=content_encoding,
             timestamp=timestamp,
             correlation_id=correlation_id,
-            reply_to=reply_to)
+            reply_to=reply_to,
+            message_id=str(message_id) if message_id is not None else None,
+            user_id=str(user_id) if user_id is not None else None,
+            app_id=str(app_id) if app_id is not None else None
+        )
 
 
 class ConnectionParameters(pika.ConnectionParameters):
