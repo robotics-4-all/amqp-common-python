@@ -4,14 +4,14 @@
 Higher-level features for AMQP, such as PubSub and RPC (server-client).
 Thing wrapper around [pika](https://pika.readthedocs.io/en/stable/).
 
-**ATTENTION**: Works with pika==1.0.1
+**ATTENTION**: Works with pika==1.1.0
 
 # Installation
 
 **CURRENTLY ONLY PYTHON2 IS SUPPORTED**
 
 ```bash
-python2 setup.py install --user
+python3 setup.py install --user
 ```
 
 or
@@ -22,4 +22,4 @@ pip install . --user
 
 # Examples
 
-Look at the `examples` folder. Includes PubSub and RPC examples.
+Look at the `examples` folder as it ncludes various examples.
