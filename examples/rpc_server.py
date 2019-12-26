@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
@@ -17,6 +17,8 @@ class MyRpcServer(amqp_common.RpcServer):
 def callback(msg, meta):
     print('Received request: \nMessage -> {}\nProperties -> {}'.format(
         msg, meta['properties']))
+    print('Channel ---> ', meta['channel'])
+    print('Method ---> ', meta['method'])
     return msg
 
 

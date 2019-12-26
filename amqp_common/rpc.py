@@ -5,14 +5,13 @@ from __future__ import absolute_import
 
 import functools
 
+import time
 import uuid
 import json
 import threading
 
 from .amqp_transport import (AMQPTransportSync, ExchangeTypes,
                              MessageProperties)
-
-from .msg import Message
 
 
 class RpcServer(AMQPTransportSync):
@@ -89,38 +88,61 @@ class RpcServer(AMQPTransportSync):
             resp = {'error': str(e)}
         if resp is None:
             resp = {}
-        resp_serial = self._serialize_data(resp)
 
-        msg_props = MessageProperties(correlation_id=properties.correlation_id)
+        _data, _ctype, _encoding = self._parse_resp(resp)
+
+        msg_props = MessageProperties(
+            correlation_id=properties.correlation_id,
+            content_type=_ctype,
+            content_encoding=_encoding,
+            timestamp=(1.0 * (time.time() + 0.5) * 1000),
+            message_id=0,
+            # user_id="",
+            # app_id="",
+        )
 
         ch.basic_publish(
             exchange=self._exchange,
             routing_key=properties.reply_to,
             properties=msg_props,
-            body=resp_serial)
+            body=_data)
         # Acknowledge receivving the message.
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def _serialize_data(self, data):
+    def _parse_resp(self, data):
         """
-        Serialize data.
-        TODO: Make class. ALlow for different implementations.
+        Dummy at the moment. Only check if it is of type dictionary.
+        """
+        _d = ""
+        _ctype = ""
+        _encoding = 'utf8'
+        if isinstance(data, dict):
+            _d = json.dumps(data)
+            _ctype = 'application/json'
+        elif isinstance(data, str):
+            _d = data
+            _ctype = 'text/plain'
+        elif isinstance(data, unicode):
+            _d = data
+            _ctype = 'text/plain'
+        else:
+            raise TypeError('Msg should be either string of dict')
+        return _d, _ctype, _encoding
 
-        @param data: Data to serialize.
-        @type data: dict|int|bool
-        """
-        return json.dumps(data)
-        # return data.serialize_json()
 
     def _deserialize_data(self, data):
         """
         DeSerialize data.
-        TODO: Make class. ALlow for different implementations.
 
         @param data: Data to deserialize.
         @type data: dict|int|bool
         """
-        return json.loads(data)
+        _d = {}
+        try:
+            _d = json.loads(data)
+        except Exception:
+            _d = data
+        return _d
 
     def close(self):
         if not self._channel:
@@ -158,6 +180,8 @@ class RpcClient(AMQPTransportSync):
         self._corr_id = None
         self._response = None
         self._exchange = ExchangeTypes.Default
+        self._mean_delay = 0
+        self._delay = 0
 
         self._consumer_tag = self._channel.basic_consume(
             'amq.rabbitmq.reply-to',
@@ -165,6 +189,14 @@ class RpcClient(AMQPTransportSync):
             exclusive=False,
             consumer_tag=None,
             auto_ack=True)
+
+    @property
+    def mean_delay(self):
+        return self._mean_delay
+
+    @property
+    def delay(self):
+        return self._delay
 
     def _on_response(self, ch, method, props, body):
         """Handle on-response event."""
@@ -181,21 +213,32 @@ class RpcClient(AMQPTransportSync):
 
     def call(self, msg, background=False, immediate=False, timeout=5.0):
         """Call RPC."""
-        self._validate_data(msg)
+        data, ctype, encoding = self._parse_msg(msg)
         self._response = None
         self._corr_id = self.gen_corr_id()
         try:
             # Direct reply-to implementation
-            rpc_props = MessageProperties(reply_to='amq.rabbitmq.reply-to')
+            rpc_props = MessageProperties(
+                content_type=ctype,
+                content_encoding=encoding,
+                timestamp=(1.0 * (time.time() + 0.5) * 1000),
+                message_id=0,
+                # user_id="",
+                # app_id="",
+                reply_to='amq.rabbitmq.reply-to'
+            )
 
             self._channel.basic_publish(
                 exchange=self._exchange,
                 routing_key=self._rpc_name,
                 mandatory=False,
                 properties=rpc_props,
-                body=self._serialize_data(msg))
+                body=data)
 
+            start_t = time.time()
             self._wait_for_response(timeout)
+            elapsed_t = time.time() - start_t
+            self._delay = elapsed_t
 
             if self._response is None:
                 resp = {'error': 'RPC Response timeout'}
@@ -212,15 +255,6 @@ class RpcClient(AMQPTransportSync):
         self.logger.debug('Waiting for response from [%s]...', self._rpc_name)
         self._connection.process_data_events(time_limit=timeout)
 
-    def _serialize_data(self, data):
-        """
-        Serialize data.
-
-        TODO: Make Class. Allow different implementation of serialization
-            classes.
-        """
-        return data.serialize_json()
-
     def _deserialize_data(self, data):
         """
         De-serialize data.
@@ -234,17 +268,28 @@ class RpcClient(AMQPTransportSync):
         resp = None
         try:
             resp = json.loads(data)
-            return resp
         except Exception:
-            pass
+            resp = data
         resp = data.decode()
         return resp
 
-    def _validate_data(self, data):
+    def _parse_msg(self, data):
         """
         Dummy at the moment. Only check if it is of type dictionary.
         """
-        if not isinstance(data, Message):
-            raise TypeError('Should be of type <Message>')
+        _raw = ""
+        _ctype = ""
+        _encoding = 'utf8'
+        if isinstance(data, dict):
+            _raw = json.dumps(data)
+            _ctype = 'application/json'
+        elif isinstance(data, str):
+            _raw = data
+            _ctype = 'text/plain'
+        elif isinstance(data, unicode):
+            _raw = data
+            _ctype = 'text/plain'
         else:
-            return False
+            raise TypeError('Msg should be either string of dict')
+        return _raw, _ctype, _encoding
+

@@ -49,6 +49,8 @@ class PublisherSync(AMQPTransportSync):
 
         """
         content_type = None
+        content_encoding = None
+        data = None
         if isinstance(msg, Message):
             content_type = 'application/json'
             content_encoding = 'utf8'
@@ -61,24 +63,25 @@ class PublisherSync(AMQPTransportSync):
             content_type = 'text/plain'
             content_encoding = 'utf8'
             data = msg
-        # elif isinstance(msg, bytes):
-        #     content_type = 'application/octet-stream'
-        #     content_encoding = 'utf8'
-        #  elif isinstance(msg, unicode):
-        #  content_type = 'text/plain'
+        elif isinstance(msg, bytes):
+            content_type = 'application/octet-stream'
+            content_encoding = 'utf8'
+            data = msg
 
         msg_props = MessageProperties(
             content_type=content_type,
             content_encoding=content_encoding,
-            timestamp=(1.0 * (time.time() + 0.5) * 1000))
+            timestamp=(1.0 * (time.time() + 0.5) * 1000),
+            message_id=0,
+            # user_id="",
+            # app_id="",
+        )
 
         if thread_safe:
             self.connection.add_callback_threadsafe(
                 functools.partial(self._send_data, data, msg_props))
         else:
             self._send_data(data, msg_props)
-        # self.connection.add_callback_threadsafe(
-        #     functools.partial(self.connection.process_data_events))
         self.connection.process_data_events()
 
     def _send_data(self, data, props):
