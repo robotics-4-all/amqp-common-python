@@ -157,7 +157,9 @@ class SubscriberSync(AMQPTransportSync):
         self.connect()
         if on_message is not None:
             self.onmessage = on_message
-        self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
+        _exch_ex = self.exchange_exists(self._topic_exchange)
+        if _exch_ex.method.NAME != 'Exchange.DeclareOk':
+            self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
         # Create a queue. Set default idle expiration time to 5 mins
         self._queue_name = self.create_queue(
             queue_size=self._queue_size,
@@ -207,6 +209,7 @@ class SubscriberSync(AMQPTransportSync):
             self.logger.error(exc, exc_info=True)
 
     def _on_msg_callback_wrapper(self, ch, method, properties, body):
+        msg = {}
         try:
             msg = self._deserialize_data(body)
         except Exception:

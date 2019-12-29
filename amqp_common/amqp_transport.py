@@ -231,8 +231,6 @@ class AMQPTransportSync(object):
 
         # So that connections do not go zombie
         atexit.register(self._graceful_shutdown)
-        #  signal.signal(signal.SIGTERM, self._signal_handler)
-        #  signal.signal(signal.SIGINT, self._signal_handler)
 
     @property
     def channel(self):
@@ -308,7 +306,15 @@ class AMQPTransportSync(object):
         self._channel.close()
         self.logger.debug('Channel closed!')
 
-    def create_exchange(self, exchange_name, exchange_type):
+    def exchange_exists(self, exchange_name):
+        resp = self._channel.exchange_declare(
+            exchange=exchange_name,
+            passive=True,  # Perform a declare or just to see if it exists
+        )
+        self.logger.debug('Exchange exists result: {}'.format(resp))
+        return resp
+
+    def create_exchange(self, exchange_name, exchange_type, internal=None):
         """
         Create a new exchange.
 
@@ -320,8 +326,11 @@ class AMQPTransportSync(object):
         """
         self._channel.exchange_declare(
             exchange=exchange_name,
-            exchange_type=exchange_type,
-            passive=True)
+            durable=True,  # Survive reboot
+            passive=False,  # Perform a declare or just to see if it exists
+            internal=internal,  # Can only be published to by other exchanges
+            exchange_type=exchange_type
+        )
 
         self.logger.debug('Created exchange: [name={}, type={}]'.format(
             exchange_name, exchange_type))

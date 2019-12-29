@@ -14,6 +14,8 @@ from .amqp_transport import (AMQPTransportSync,
                              ExchangeTypes,
                              MessageProperties)
 
+from .pubsub import SubscriberSync
+
 
 class Event(object):
 
@@ -61,7 +63,7 @@ class EventEmitterOptions(object):
         'content_encoding'
     ]
 
-    def __init__(self, exchange='amq.topic'):
+    def __init__(self, exchange='events'):
         self.exchange = exchange
         self.exchange_type = ExchangeTypes.Topic
         self.content_type = 'application/json'
@@ -112,3 +114,80 @@ class EventEmitter(AMQPTransportSync):
             properties=props,
             body=json.dumps(event.to_dict())
         )
+
+
+class InternalEventType(object):
+    class Queue(object):
+        DELETED = 'queue.deleted'
+        CREATED = 'queue.created'
+
+    class Exchange(object):
+        DELETED = 'exchange.deleted'
+        CREATED = 'exchange.created'
+
+    class Binding(object):
+        DELETED = 'binding.deleted'
+        CREATED = 'binding.created'
+
+    class Connection(object):
+        CREATED = 'connection.created'
+        CLOSED = 'connection.closed'
+
+    class Channel(object):
+        CREATED = 'channel.created'
+        CLOSED = 'channel.closed'
+
+    class Consumer(object):
+        DELETED = 'consumer.deleted'
+        CREATED = 'consumer.created'
+
+    class User(object):
+        AUTH_OK = 'user.authentication.success'
+        AUTH_FAILED = 'user.authentication.failure'
+        CREATED = 'user.created'
+        DELETED = 'user.deleted'
+        PASSWORD_CHANGED = 'user.password.changed'
+        PASSWORD_CLEARED = 'user.password.cleared'
+        TAGS_SET = 'user.tags.set'
+
+
+class EventListenerHandle(object):
+    def __init__(self, event_name, sub_obj):
+        self._event_name = event_name
+        self._sub = sub_obj
+
+    @property
+    def event_name(self):
+        return self._event_name
+
+    def run(self):
+        self._sub.run_threaded()
+
+    def stop(self):
+        raise NotImplementedError()
+
+
+class InternalEventListener(object):
+
+    def __init__(self, connection_params, debug=False):
+        self.exchange = 'amq.rabbitmq.event'
+        self.connection_params = connection_params
+        self.debug = debug
+        self.listener_map = {}
+
+    def listen(self, event, callback):
+        listener = self._create_listener(event, callback)
+        listener.run()
+        self._add_listener_to_map(listener)
+
+    def _create_listener(self, event, callback):
+        sub = SubscriberSync(
+            event, on_message=callback,
+            exchange=self.exchange,
+            connection_params=self.connection_params,
+            debug=self.debug
+        )
+        return EventListenerHandle(event, sub)
+
+    def _add_listener_to_map(self, listener):
+        self.listener_map[listener.event_name] = listener

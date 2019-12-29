@@ -7,10 +7,11 @@ from .timer import Timer
 from .rate import Rate
 from .msg import Message, HeaderMessage, FileMessage
 from .events import Event, EventEmitterOptions, EventEmitter
+from .events import InternalEventListener, InternalEventType
 
 __all__ = [
     'PublisherSync', 'SubscriberSync', 'RpcClient', 'RpcServer', 'Credentials',
     'ConnectionParameters', 'Timer', 'SharedConnection', 'Rate', 'Message',
     'HeaderMessage', 'FileMessage', 'Event', 'EventEmitter',
-    'EventEmitterOptions'
+    'EventEmitterOptions', 'InternalEventListener', 'InternalEventType'
 ]

@@ -57,7 +57,8 @@ if __name__ == '__main__':
     event_id = args.event_id
     debug = True if args.debug else False
 
-    options = amqp_common.EventEmitterOptions(exchange='amq.topic')
+    # Uses amqp.event exchange by default. This is of type Topic
+    options = amqp_common.EventEmitterOptions()
 
     event_em = amqp_common.EventEmitter(
         options,
