@@ -25,13 +25,9 @@ class RpcServer(AMQPTransportSync):
         self._name = rpc_name
         self._rpc_name = rpc_name
         AMQPTransportSync.__init__(self, *args, **kwargs)
-        self.connect()
         self._exchange = exchange
         # Bind on_request callback
         self.on_request = on_request
-
-        self._rpc_queue = self.create_queue(self._rpc_name)
-        self._channel.basic_qos(prefetch_count=1, global_qos=False)
 
     def is_alive(self):
         if self.connection is None:
@@ -43,6 +39,9 @@ class RpcServer(AMQPTransportSync):
 
     def run(self):
         """."""
+        self.connect()
+        self._rpc_queue = self.create_queue(self._rpc_name)
+        self._channel.basic_qos(prefetch_count=1, global_qos=False)
         self._consume()
         try:
             self._channel.start_consuming()
