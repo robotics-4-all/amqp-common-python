@@ -1,10 +1,26 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Copyright (C) 2020  Panayiotou, Konstantinos <klpanagi@gmail.com>
+# Author: Panayiotou, Konstantinos <klpanagi@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 
 from __future__ import absolute_import
 
 import functools
 
+import time
 import uuid
 import json
 import threading
@@ -24,13 +40,9 @@ class RpcServer(AMQPTransportSync):
         self._name = rpc_name
         self._rpc_name = rpc_name
         AMQPTransportSync.__init__(self, *args, **kwargs)
-        self.connect()
         self._exchange = exchange
         # Bind on_request callback
         self.on_request = on_request
-
-        self._rpc_queue = self.create_queue(self._rpc_name)
-        self._channel.basic_qos(prefetch_count=1, global_qos=False)
 
     def is_alive(self):
         if self.connection is None:
@@ -42,12 +54,18 @@ class RpcServer(AMQPTransportSync):
 
     def run(self):
         """."""
+        self.connect()
+        self._rpc_queue = self.create_queue(self._rpc_name)
+        self._channel.basic_qos(prefetch_count=1, global_qos=False)
         self._consume()
-        self._channel.start_consuming()
+        try:
+            self._channel.start_consuming()
+        except Exception as exc:
+            self.logger.error(exc, exc_info=True)
 
     def process_requests(self):
         self.connection.process_data_events()
-        # self.connection.add_callback_threadsafe(
+        # self.conection.add_callback_threadsafe(
         #         functools.partial(self.connection.process_data_events))
 
     def run_threaded(self):
@@ -66,16 +84,12 @@ class RpcServer(AMQPTransportSync):
         self._consume()
 
     def _consume(self):
-        self._channel.basic_consume(
+        self.consumer_tag = self._channel.basic_consume(
             self._rpc_queue,
             self._on_request_wrapper)
-        self.logger.info('[x] - Awaiting RPC requests')
+        self.logger.info('[x] - RPC Endpoint ready: {}'.format(self._rpc_name))
 
     def _on_request_wrapper(self, ch, method, properties, body):
-        self.logger.debug(
-            'Received Request:' + '\n- [*] Method: %s' +
-            '\n- [*] Properties: %s' + '\n- [*] Channel: %s', method,
-            properties, ch)
         try:
             msg = self._deserialize_data(body)
             meta = {'channel': ch, 'method': method, 'properties': properties}
@@ -86,46 +100,82 @@ class RpcServer(AMQPTransportSync):
         except Exception as e:
             self.logger.exception('')
             resp = {'error': str(e)}
-        resp_serial = self._serialize_data(resp)
+        if resp is None:
+            resp = {}
 
-        msg_props = MessageProperties(correlation_id=properties.correlation_id)
+        _data, _ctype, _encoding = self._parse_resp(resp)
+
+        msg_props = MessageProperties(
+            correlation_id=properties.correlation_id,
+            content_type=_ctype,
+            content_encoding=_encoding,
+            timestamp=(1.0 * (time.time() + 0.5) * 1000),
+            message_id=0,
+            # user_id="",
+            # app_id="",
+        )
 
         ch.basic_publish(
             exchange=self._exchange,
             routing_key=properties.reply_to,
             properties=msg_props,
-            body=resp_serial)
+            body=_data)
         # Acknowledge receivving the message.
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def _serialize_data(self, data):
+    def _parse_resp(self, data):
         """
-        Serialize data.
-        TODO: Make class. ALlow for different implementations.
+        Dummy at the moment. Only check if it is of type dictionary.
+        """
+        _d = ""
+        _ctype = ""
+        _encoding = 'utf8'
+        if isinstance(data, dict):
+            _d = json.dumps(data)
+            _ctype = 'application/json'
+        elif isinstance(data, str):
+            _d = data
+            _ctype = 'text/plain'
+        elif isinstance(data, unicode):
+            _d = data
+            _ctype = 'text/plain'
+        else:
+            raise TypeError('Msg should be either string of dict')
+        return _d, _ctype, _encoding
 
-        @param data: Data to serialize.
-        @type data: dict|int|bool
-        """
-        return json.dumps(data)
 
     def _deserialize_data(self, data):
         """
         DeSerialize data.
-        TODO: Make class. ALlow for different implementations.
 
         @param data: Data to deserialize.
         @type data: dict|int|bool
         """
-        return json.loads(data)
+        _d = {}
+        try:
+            _d = json.loads(data)
+        except Exception:
+            _d = data
+        return _d
 
     def close(self):
+        if not self._channel:
+            return
         if self._channel.is_closed:
-            self.logger.warning('Invoked close() on an already closed channel')
+            self.logger.warning('Channel was already closed!')
             return False
+        self._channel.stop_consuming()
+        # super(RpcServer, self).close()
         self.delete_queue(self._rpc_queue)
-        super(RpcServer, self).close()
+        return True
+
+    def stop(self):
+        return self.close()
 
     def __del__(self):
+        self.close()
+
+    def __exit__(self, exc_type, value, traceback):
         self.close()
 
 
@@ -144,11 +194,23 @@ class RpcClient(AMQPTransportSync):
         self._corr_id = None
         self._response = None
         self._exchange = ExchangeTypes.Default
+        self._mean_delay = 0
+        self._delay = 0
 
-        self._channel.basic_consume(
+        self._consumer_tag = self._channel.basic_consume(
             'amq.rabbitmq.reply-to',
             self._on_response,
+            exclusive=False,
+            consumer_tag=None,
             auto_ack=True)
+
+    @property
+    def mean_delay(self):
+        return self._mean_delay
+
+    @property
+    def delay(self):
+        return self._delay
 
     def _on_response(self, ch, method, props, body):
         """Handle on-response event."""
@@ -165,22 +227,32 @@ class RpcClient(AMQPTransportSync):
 
     def call(self, msg, background=False, immediate=False, timeout=5.0):
         """Call RPC."""
-        if not self._validate_data(msg):
-            raise TypeError('Should be of type dict')
+        data, ctype, encoding = self._parse_msg(msg)
         self._response = None
         self._corr_id = self.gen_corr_id()
         try:
             # Direct reply-to implementation
-            rpc_props = MessageProperties(reply_to='amq.rabbitmq.reply-to')
+            rpc_props = MessageProperties(
+                content_type=ctype,
+                content_encoding=encoding,
+                timestamp=(1.0 * (time.time() + 0.5) * 1000),
+                message_id=0,
+                # user_id="",
+                # app_id="",
+                reply_to='amq.rabbitmq.reply-to'
+            )
 
             self._channel.basic_publish(
                 exchange=self._exchange,
                 routing_key=self._rpc_name,
                 mandatory=False,
                 properties=rpc_props,
-                body=self._serialize_data(msg))
+                body=data)
 
+            start_t = time.time()
             self._wait_for_response(timeout)
+            elapsed_t = time.time() - start_t
+            self._delay = elapsed_t
 
             if self._response is None:
                 resp = {'error': 'RPC Response timeout'}
@@ -197,15 +269,6 @@ class RpcClient(AMQPTransportSync):
         self.logger.debug('Waiting for response from [%s]...', self._rpc_name)
         self._connection.process_data_events(time_limit=timeout)
 
-    def _serialize_data(self, data):
-        """
-        Serialize data.
-
-        TODO: Make Class. Allow different implementation of serialization
-            classes.
-        """
-        return json.dumps(data)
-
     def _deserialize_data(self, data):
         """
         De-serialize data.
@@ -219,17 +282,28 @@ class RpcClient(AMQPTransportSync):
         resp = None
         try:
             resp = json.loads(data)
-            return resp
         except Exception:
-            pass
+            resp = data
         resp = data.decode()
         return resp
 
-    def _validate_data(self, data):
+    def _parse_msg(self, data):
         """
         Dummy at the moment. Only check if it is of type dictionary.
         """
+        _raw = ""
+        _ctype = ""
+        _encoding = 'utf8'
         if isinstance(data, dict):
-            return True
+            _raw = json.dumps(data)
+            _ctype = 'application/json'
+        elif isinstance(data, str):
+            _raw = data
+            _ctype = 'text/plain'
+        elif isinstance(data, unicode):
+            _raw = data
+            _ctype = 'text/plain'
         else:
-            return False
+            raise TypeError('Msg should be either string of dict')
+        return _raw, _ctype, _encoding
+

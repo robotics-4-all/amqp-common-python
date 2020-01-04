@@ -1,5 +1,19 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Copyright (C) 2020  Panayiotou, Konstantinos <klpanagi@gmail.com>
+# Author: Panayiotou, Konstantinos <klpanagi@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
 
@@ -12,10 +26,21 @@ import time
 from .amqp_transport import (AMQPTransportSync, Credentials, ExchangeTypes,
                              MessageProperties)
 from .rate import Rate
+from .msg import Message
+from .serializer import JSONSerializer
 
 
 class PublisherSync(AMQPTransportSync):
-    def __init__(self, topic, exchange='amq.topic', *args, **kwargs):
+    Serializer = JSONSerializer
+
+    def __init__(
+        self,
+        topic,
+        exchange='amq.topic',
+        serializer=None,
+        *args,
+        **kwargs
+    ):
         """
         Constructor.
 
@@ -26,6 +51,8 @@ class PublisherSync(AMQPTransportSync):
         self._topic_exchange = exchange
         self._topic = topic
         self._name = topic
+        if serializer is not None:
+            self.Serializer = serializer
         AMQPTransportSync.__init__(self, *args, **kwargs)
         self.connect()
         self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
@@ -42,40 +69,48 @@ class PublisherSync(AMQPTransportSync):
 
         """
         content_type = None
+        content_encoding = None
+        data = None
+        if isinstance(msg, Message):
+            content_type = 'application/json'
+            content_encoding = 'utf8'
+            data = self.Serializer.serialize(msg)
         if isinstance(msg, dict):
             content_type = 'application/json'
             content_encoding = 'utf8'
+            data = json.dumps(msg)
         elif isinstance(msg, str):
             content_type = 'text/plain'
             content_encoding = 'utf8'
-        if isinstance(msg, bytes):
+            data = msg
+        elif isinstance(msg, bytes):
             content_type = 'application/octet-stream'
             content_encoding = 'utf8'
-        #  elif isinstance(msg, unicode):
-        #  content_type = 'text/plain'
+            data = msg
 
         msg_props = MessageProperties(
             content_type=content_type,
             content_encoding=content_encoding,
-            timestamp=int((time.time() + 0.5) * 1000))
+            timestamp=(1.0 * (time.time() + 0.5) * 1000),
+            message_id=0,
+            # user_id="",
+            # app_id="",
+        )
 
         if thread_safe:
             self.connection.add_callback_threadsafe(
-                functools.partial(self._pub, msg, msg_props))
+                functools.partial(self._send_data, data, msg_props))
         else:
-            self._pub(msg, msg_props)
-        # self.connection.add_callback_threadsafe(
-        #     functools.partial(self.connection.process_data_events))
+            self._send_data(data, msg_props)
         self.connection.process_data_events()
 
-    def _pub(self, msg, props):
+    def _send_data(self, data, props):
         self._channel.basic_publish(
             exchange=self._topic_exchange,
             routing_key=self._topic,
             properties=props,
-            body=self._serialize_data(msg))
-        self.logger.debug('[x] - Sent %r:%r' % (self._topic, msg))
-
+            body=data)
+        self.logger.debug('Sent message to topic <{}>'.format(self._topic))
 
     def pub_loop(self, data_bind, hz):
         """
@@ -102,13 +137,6 @@ class PublisherSync(AMQPTransportSync):
             except KeyboardInterrupt:
                 self.logger.exception('Process received keyboard interrupt')
                 break
-
-    def _serialize_data(self, data):
-        """
-        TODO: Make Class. Allow different implementation of serialization
-            classes.
-        """
-        return json.dumps(data)
 
 
 class SubscriberSync(AMQPTransportSync):
@@ -146,15 +174,21 @@ class SubscriberSync(AMQPTransportSync):
         self._message_ttl = message_ttl
         self._overflow = overflow
         self.connect()
+
         if on_message is not None:
             self.onmessage = on_message
-        self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
+
+        _exch_ex = self.exchange_exists(self._topic_exchange)
+        if _exch_ex.method.NAME != 'Exchange.DeclareOk':
+            self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
+
         # Create a queue. Set default idle expiration time to 5 mins
         self._queue_name = self.create_queue(
             queue_size=self._queue_size,
             message_ttl=self._message_ttl,
             overflow_behaviour=self._overflow,
             expires=300000)
+
         # Bind queue to the Topic exchange
         self.bind_queue(self._topic_exchange, self._queue_name, self._topic)
         self._last_msg_ts = None
@@ -198,19 +232,25 @@ class SubscriberSync(AMQPTransportSync):
             self.logger.error(exc, exc_info=True)
 
     def _on_msg_callback_wrapper(self, ch, method, properties, body):
+        msg = {}
         try:
             msg = self._deserialize_data(body)
         except Exception:
-            self.logger.error("Could not deserialize data", exc_info=True)
-            # Do not invoke the onmessage callback
-            return
+            self.logger.error("Could not deserialize (json) data",
+                              exc_info=True)
+            # Return data as is. Let callback handle with encoding...
+            msg = body
 
         self._sem.acquire()
         self._calc_msg_frequency()
         self._sem.release()
 
         if self.onmessage is not None:
-            meta = {'channel': ch, 'method': method, 'properties': properties}
+            meta = {
+                'channel': ch,
+                'method': method,
+                'properties': properties
+            }
             self.onmessage(msg, meta)
 
     def _calc_msg_frequency(self):

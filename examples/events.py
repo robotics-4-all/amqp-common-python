@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 # Copyright (C) 2020  Panayiotou, Konstantinos <klpanagi@gmail.com>
 # Author: Panayiotou, Konstantinos <klpanagi@gmail.com>
 #
@@ -25,22 +26,11 @@ import argparse
 import amqp_common
 
 
-class MyRpcServer(amqp_common.RpcServer):
-    def __init__(self):
-        pass
-
-
-def callback(msg, meta):
-    print('Received request: \nMessage -> {}\nProperties -> {}'.format(
-        msg, meta['properties']))
-    print('Channel ---> ', meta['channel'])
-    print('Method ---> ', meta['method'])
-    return msg
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='AMQP RPC Server CLI.')
-    parser.add_argument('rpc', action='store', help='RPC name to call.')
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='AMQP Publisher CLI.')
+    parser.add_argument('event_id', action='store', help='Topic to publish.')
+    parser.add_argument(
+        '--hz', dest='hz', help='Publishing frequency', type=int, default=2)
     parser.add_argument(
         '--host',
         dest='host',
@@ -55,7 +45,7 @@ if __name__ == "__main__":
         '--vhost',
         dest='vhost',
         help='Virtual host to connect to.',
-        default='/')
+        default='/klpanagi')
     parser.add_argument(
         '--username',
         dest='username',
@@ -75,19 +65,32 @@ if __name__ == "__main__":
         nargs='?')
 
     args = parser.parse_args()
+    hz = args.hz
     host = args.host
     port = args.port
     vhost = args.vhost
     username = args.username
     password = args.password
-    rpc_name = args.rpc
+    event_id = args.event_id
     debug = True if args.debug else False
 
-    conn_params = amqp_common.ConnectionParameters(
-        host=host, port=port, vhost=vhost)
-    conn_params.credentials = amqp_common.Credentials(username, password)
-    conn = amqp_common.SharedConnection(conn_params)
+    # Uses amqp.event exchange by default. This is of type Topic
+    options = amqp_common.EventEmitterOptions()
 
-    rpc_server = amqp_common.RpcServer(
-        rpc_name, on_request=callback, connection=conn)
-    rpc_server.run()
+    event_em = amqp_common.EventEmitter(
+        options,
+        connection_params=amqp_common.ConnectionParameters(
+            host=host, port=port, vhost=vhost),
+        creds=amqp_common.Credentials(username, password),
+        debug=debug
+    )
+
+    event = amqp_common.Event(name=event_id,
+                              payload={'a': 1},
+                              headers={'b': 1}
+                              )
+    rate = amqp_common.Rate(hz)
+    while True:
+        # Publish once
+        event_em.send_event(event)
+        rate.sleep()

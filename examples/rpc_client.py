@@ -1,10 +1,27 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Copyright (C) 2020  Panayiotou, Konstantinos <klpanagi@gmail.com>
+# Author: Panayiotou, Konstantinos <klpanagi@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 
 from __future__ import print_function
 
 import sys
 import argparse
+import json
 
 import amqp_common
 
@@ -40,6 +57,16 @@ if __name__ == "__main__":
         help='Authentication password',
         default='b0t')
     parser.add_argument(
+        '--timeout',
+        dest='timeout',
+        help='Response Timeout value',
+        default=20)
+    parser.add_argument(
+        '--data',
+        dest='data',
+        help='Data to send',
+        default='{}')
+    parser.add_argument(
         '--debug',
         dest='debug',
         help='Enable debugging',
@@ -54,21 +81,31 @@ if __name__ == "__main__":
     username = args.username
     password = args.password
     rpc_name = args.rpc
+    timeout = args.timeout
     hz = args.hz
+    data = args.data
     debug = True if args.debug else False
 
+    data = json.loads(data)
+
     conn_params = amqp_common.ConnectionParameters(
-        host=host, port=port, vhost=vhost)
+        host=host,
+        port=port,
+        vhost=vhost
+    )
     conn_params.credentials = amqp_common.Credentials(username, password)
-    conn = amqp_common.SharedConnection(conn_params)
 
-    rpc_client = amqp_common.RpcClient(rpc_name, connection=conn)
-
-    data = {'a': 4, 'b': 13}
+    rpc_client = amqp_common.RpcClient(rpc_name, connection_params=conn_params)
 
     rpc_client.debug = True
+    if hz == 0:
+        resp = rpc_client.call(data, timeout=timeout)
+        print(resp)
+        sys.exit(0)
+
     rate = amqp_common.Rate(hz)
     while True:
-        resp = rpc_client.call(data)
+        resp = rpc_client.call(data, timeout=timeout)
         print(resp)
+        print("----------> Call execution time: {}".format(rpc_client.delay))
         rate.sleep()
