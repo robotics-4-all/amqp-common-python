@@ -62,9 +62,9 @@ if __name__ == "__main__":
         help='Response Timeout value',
         default=20)
     parser.add_argument(
-        '--msg',
-        dest='msg',
-        help='Message to send',
+        '--data',
+        dest='data',
+        help='Data to send',
         default='{}')
     parser.add_argument(
         '--debug',
@@ -83,27 +83,29 @@ if __name__ == "__main__":
     rpc_name = args.rpc
     timeout = args.timeout
     hz = args.hz
-    msg = args.msg
+    data = args.data
     debug = True if args.debug else False
 
+    data = json.loads(data)
+
     conn_params = amqp_common.ConnectionParameters(
-        host=host, port=port, vhost=vhost)
+        host=host,
+        port=port,
+        vhost=vhost
+    )
     conn_params.credentials = amqp_common.Credentials(username, password)
-    conn = amqp_common.SharedConnection(conn_params)
 
-    rpc_client = amqp_common.RpcClient(rpc_name, connection=conn)
-
-    msg = json.loads(msg)
+    rpc_client = amqp_common.RpcClient(rpc_name, connection_params=conn_params)
 
     rpc_client.debug = True
     if hz == 0:
-        resp = rpc_client.call(msg, timeout=timeout)
+        resp = rpc_client.call(data, timeout=timeout)
         print(resp)
         sys.exit(0)
 
     rate = amqp_common.Rate(hz)
     while True:
-        resp = rpc_client.call(msg, timeout=timeout)
+        resp = rpc_client.call(data, timeout=timeout)
         print(resp)
         print("----------> Call execution time: {}".format(rpc_client.delay))
         rate.sleep()
