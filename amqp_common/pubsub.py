@@ -19,8 +19,14 @@ from .serializer import JSONSerializer
 class PublisherSync(AMQPTransportSync):
     Serializer = JSONSerializer
 
-    def __init__(self, topic, exchange='amq.topic', serializer=None,
-                 *args, **kwargs):
+    def __init__(
+        self,
+        topic,
+        exchange='amq.topic',
+        serializer=None,
+        *args,
+        **kwargs
+    ):
         """
         Constructor.
 
@@ -85,13 +91,12 @@ class PublisherSync(AMQPTransportSync):
         self.connection.process_data_events()
 
     def _send_data(self, data, props):
-        self.logger.debug('Sending message to topic <{}>'.format(self._topic))
         self._channel.basic_publish(
             exchange=self._topic_exchange,
             routing_key=self._topic,
             properties=props,
             body=data)
-        # self.logger.debug('[x] - Sent %r:%r' % (self._topic, data))
+        self.logger.debug('Sent message to topic <{}>'.format(self._topic))
 
     def pub_loop(self, data_bind, hz):
         """
@@ -155,17 +160,21 @@ class SubscriberSync(AMQPTransportSync):
         self._message_ttl = message_ttl
         self._overflow = overflow
         self.connect()
+
         if on_message is not None:
             self.onmessage = on_message
+
         _exch_ex = self.exchange_exists(self._topic_exchange)
         if _exch_ex.method.NAME != 'Exchange.DeclareOk':
             self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
+
         # Create a queue. Set default idle expiration time to 5 mins
         self._queue_name = self.create_queue(
             queue_size=self._queue_size,
             message_ttl=self._message_ttl,
             overflow_behaviour=self._overflow,
             expires=300000)
+
         # Bind queue to the Topic exchange
         self.bind_queue(self._topic_exchange, self._queue_name, self._topic)
         self._last_msg_ts = None
@@ -223,7 +232,11 @@ class SubscriberSync(AMQPTransportSync):
         self._sem.release()
 
         if self.onmessage is not None:
-            meta = {'channel': ch, 'method': method, 'properties': properties}
+            meta = {
+                'channel': ch,
+                'method': method,
+                'properties': properties
+            }
             self.onmessage(msg, meta)
 
     def _calc_msg_frequency(self):
