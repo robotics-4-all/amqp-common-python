@@ -5,8 +5,10 @@ from __future__ import print_function
 
 import sys
 import argparse
+import json
 
 import amqp_common
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='AMQP Publisher CLI.')
@@ -39,6 +41,11 @@ if __name__ == '__main__':
         help='Authentication password',
         default='b0t')
     parser.add_argument(
+        '--data',
+        dest='data',
+        help='Data to send in json format',
+        default='{\"data\": \"TEST\"}')
+    parser.add_argument(
         '--debug',
         dest='debug',
         help='Enable debugging',
@@ -55,8 +62,8 @@ if __name__ == '__main__':
     password = args.password
     topic = args.topic
     debug = True if args.debug else False
-
-    data = {'a': 10, 'b': 20}
+    data = args.data
+    data = json.loads(data)
 
     pub = amqp_common.PublisherSync(
         topic,
