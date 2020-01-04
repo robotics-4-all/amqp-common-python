@@ -18,7 +18,7 @@ def read(fname):
 setup(
     install_requires=read('requirements.txt').splitlines(),
     name='amqp_common',
-    version='0.9.5',
+    version='0.9.6',
     description=
         'RPC and PubSub implementation in python over AMQP.' +
         'Thin wrapper arround Pika',
@@ -28,7 +28,7 @@ setup(
     author_email='klpanagi@gmail.com',
     maintainer='Konstantinos Panayiotou',
     maintainer_email='klpanagi@gmail.com',
-    license='Apache 2',
+    license='GNUv3',
     test_suite='tests',
     include_package_data=True,
     # A list naming all the packages you want to include
