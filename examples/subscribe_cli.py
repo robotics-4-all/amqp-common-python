@@ -33,20 +33,22 @@ def callback(msg, meta):
         props = meta['properties']
         print('[*] - Channel={}'.format(channel))
         print('[*] - Method={}'.format(method))
-        print('[*] - Properties={}'.format(props))
+        # print('[*] - Properties={}'.format(props))
         print('[*] - Data -->')
         print(json.dumps(msg, indent=2))
 
+        print(props.delivery_mode)
+
+
         timestamp_send = meta['properties'].timestamp
-        timestamp_broker = meta['properties'].headers['timestamp_in_ms']
+        timestamp_broker = float(meta['properties'].headers['timestamp_in_ms'])
 
         timestamp_now = 1.0 * (time.time() + 0.5) * 1000
 
-        m2c_delay = 1.0 * (timestamp_broker - timestamp_send) / 1000
-        m2m_delay = 1.0 * (timestamp_now - timestamp_send) / 1000
+        m2m_delay = 1.0 * (timestamp_now - timestamp_send)
 
-        print('[*] - Network M2C Delay: {}'.format(m2c_delay))
-        print('[*] - Network M2M Delay: {}'.format(m2m_delay))
+        # print('[*] - Network M2C Delay: {}'.format(m2c_delay))
+        print('[*] - Network M2M Delay: {} ms'.format(m2m_delay))
     except Exception as e:
         print(e)
 

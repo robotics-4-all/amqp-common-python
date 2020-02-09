@@ -91,7 +91,7 @@ class PublisherSync(AMQPTransportSync):
         msg_props = MessageProperties(
             content_type=content_type,
             content_encoding=content_encoding,
-            timestamp=(1.0 * (time.time() + 0.5) * 1000),
+            # timestamp=(1.0 * (time.time() + 0.5) * 1000),
             message_id=0,
             # user_id="",
             # app_id="",
