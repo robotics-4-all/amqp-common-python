@@ -8,10 +8,9 @@ Thing wrapper around [pika](https://pika.readthedocs.io/en/stable/).
 
 # Installation
 
-**CURRENTLY ONLY PYTHON2 IS SUPPORTED**
 
 ```bash
-python3 setup.py install --user
+python setup.py install --user
 ```
 
 or
