@@ -16,33 +16,50 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from __future__ import absolute_import
+from __future__ import (
+    absolute_import,
+    division,
+    print_function,
+    unicode_literals
+)
 
 import json
 
 
-class MessageSerializer(object):
-    def __init__(self):
-        pass
+class ContentType(object):
+    json = 'application/json'
+    raw_bytes = 'application/octet-stream'
+    text = 'plain/text'
 
+
+class Serializer(object):
+    CONTENT_TYPE = 'None'
+    CONTENT_ENCODING = 'None'
+
+    @staticmethod
     def serialize(self, msg):
         raise NotImplementedError()
 
+    @staticmethod
     def deserialize(self, data):
         raise NotImplementedError()
 
 
-class JSONSerializer(object):
-    def __init__(self):
-        pass
+# class ByteSerializer(Serializer):
+#     CONTENT_TYPE = 'application/octet-stream'
+#     CONTENT_ENCODING = 'utf8'
 
-    def serialize(self, msg):
-        return json.dumps(msg._to_dict())
 
-    def deserialize(self, data, msg_cls):
-        msg = msg_cls()
-        if isinstance(data, dict):
-            msg._from_dict(data)
-        else:
-            raise TypeError('data must be of type dict')
-        return msg
+class JSONSerializer(Serializer):
+    CONTENT_TYPE = 'application/json'
+    CONTENT_ENCODING = 'utf8'
+
+    @staticmethod
+    def serialize(_dict):
+        if not isinstance(_dict, dict):
+            raise TypeError('Data are not in dict structure.')
+        return json.dumps(_dict)
+
+    @staticmethod
+    def deserialize(data):
+        return json.loads(data)

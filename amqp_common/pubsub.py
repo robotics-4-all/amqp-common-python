@@ -27,20 +27,20 @@ from .amqp_transport import (AMQPTransportSync, Credentials, ExchangeTypes,
                              MessageProperties)
 from .rate import Rate
 from .msg import Message
-from .serializer import JSONSerializer
+from .serializer import JSONSerializer, ContentType
 
 
 class PublisherSync(AMQPTransportSync):
-    Serializer = JSONSerializer
+    """Publisher Implementation"""
 
-    def __init__(
-        self,
-        topic,
-        exchange='amq.topic',
-        serializer=None,
-        *args,
-        **kwargs
-    ):
+    _SERIALIZER = JSONSerializer
+
+    def __init__(self,
+                 topic,
+                 exchange='amq.topic',
+                 serializer=None,
+                 *args,
+                 **kwargs):
         """
         Constructor.
 
@@ -52,7 +52,7 @@ class PublisherSync(AMQPTransportSync):
         self._topic = topic
         self._name = topic
         if serializer is not None:
-            self.Serializer = serializer
+            self._SERIALIZER = serializer
         AMQPTransportSync.__init__(self, *args, **kwargs)
         self.connect()
         self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
@@ -68,48 +68,50 @@ class PublisherSync(AMQPTransportSync):
         @type msg: dict
 
         """
-        content_type = None
-        content_encoding = None
-        data = None
         if isinstance(msg, Message):
-            content_type = 'application/json'
-            content_encoding = 'utf8'
-            data = self.Serializer.serialize(msg)
-        if isinstance(msg, dict):
-            content_type = 'application/json'
-            content_encoding = 'utf8'
-            data = json.dumps(msg)
-        elif isinstance(msg, str):
-            content_type = 'text/plain'
-            content_encoding = 'utf8'
-            data = msg
-        elif isinstance(msg, bytes):
-            content_type = 'application/octet-stream'
-            content_encoding = 'utf8'
+            data = msg.to_dict()
+        else:
             data = msg
 
+        if thread_safe:
+            self.connection.add_callback_threadsafe(
+                functools.partial(self._send_data, data))
+        else:
+            self._send_data(data)
+        self.connection.process_data_events()
+
+    def _send_data(self, data):
+        _payload = None
+        _encoding = None
+        _type = None
+
+        if isinstance(data, dict):
+            _payload = self._SERIALIZER.serialize(data).encode('utf-8')
+            _encoding = self._SERIALIZER.CONTENT_ENCODING
+            _type = self._SERIALIZER.CONTENT_TYPE
+        elif isinstance(data, str):
+            _type = 'text/plain'
+            _encoding = 'utf8'
+            _payload = data
+        elif isinstance(msg, bytes):
+            _type = 'application/octet-stream'
+            _encoding = 'utf8'
+            _payload = data
+
         msg_props = MessageProperties(
-            content_type=content_type,
-            content_encoding=content_encoding,
+            content_type=_type,
+            content_encoding=_encoding,
             # timestamp=(1.0 * (time.time() + 0.5) * 1000),
             message_id=0,
             # user_id="",
             # app_id="",
         )
 
-        if thread_safe:
-            self.connection.add_callback_threadsafe(
-                functools.partial(self._send_data, data, msg_props))
-        else:
-            self._send_data(data, msg_props)
-        self.connection.process_data_events()
-
-    def _send_data(self, data, props):
         self._channel.basic_publish(
             exchange=self._topic_exchange,
             routing_key=self._topic,
-            properties=props,
-            body=data)
+            properties=msg_props,
+            body=_payload)
         self.logger.debug('Sent message to topic <{}>'.format(self._topic))
 
     def pub_loop(self, data_bind, hz):
@@ -234,22 +236,39 @@ class SubscriberSync(AMQPTransportSync):
     def _on_msg_callback_wrapper(self, ch, method, properties, body):
         msg = {}
         try:
-            msg = self._deserialize_data(body)
+            _ctype = properties.content_type
+            _cencoding = properties.content_encoding
+            _ts_broker = properties.headers['timestamp_in_ms']
+            _dmode = properties.delivery_mode
+            _ts_send = properties.timestamp
+            # _ts_broker = properties.timestamp
+
+            msg = self._deserialize_data(body, _ctype, _cencoding)
         except Exception:
-            self.logger.error("Could not deserialize (json) data",
+            self.logger.error("Could not deserialize data",
                               exc_info=True)
             # Return data as is. Let callback handle with encoding...
             msg = body
 
-        self._sem.acquire()
-        self._calc_msg_frequency()
-        self._sem.release()
+        try:
+            self._sem.acquire()
+            self._calc_msg_frequency()
+            self._sem.release()
+        except Exception:
+            self.logger.error("Could not calculate message rate",
+                              exc_info=True)
 
         if self.onmessage is not None:
             meta = {
                 'channel': ch,
                 'method': method,
-                'properties': properties
+                'properties': {
+                    'content_type': _ctype,
+                    'content_encoding': _cencoding,
+                    'timestamp_broker': _ts_broker,
+                    'timestamp_producer': _ts_send,
+                    'delivery_mode': _dmode
+                }
             }
             self.onmessage(msg, meta)
 
@@ -268,7 +287,7 @@ class SubscriberSync(AMQPTransportSync):
                 self._hz = _sum / len(hz_list)
         self._last_msg_ts = ts
 
-    def _deserialize_data(self, data):
+    def _deserialize_data(self, data, content_type, content_encoding):
         """
         Deserialize data.
 
@@ -277,4 +296,13 @@ class SubscriberSync(AMQPTransportSync):
         @param data: Data to deserialize.
         @type data: dict|int|bool
         """
-        return json.loads(data)
+        _data = None
+        if content_encoding is None:
+            content_encoding = 'utf8'
+        if content_type == ContentType.json:
+            _data = JSONSerializer.deserialize(data)
+        elif content_type == ContentType.text:
+            _data = data.decode(content_encoding)
+        elif content_type == ContentType.raw_bytes:
+            _data = data
+        return _data

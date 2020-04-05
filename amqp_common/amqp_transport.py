@@ -15,8 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-from __future__ import absolute_import
+from __future__ import (
+    absolute_import,
+    division,
+    print_function,
+    unicode_literals
+)
 
 import time
 import atexit
@@ -167,6 +171,16 @@ class ConnectionParameters(pika.ConnectionParameters):
         return _str
 
 
+class AMQPConnection(pika.BlockingConnection):
+    """Connection. Thin wrapper around pika.BlockingConnection"""
+    def __init__(self, conn_params):
+        self._connection_params = conn_params
+        self._pika_connection = None
+        super(AMQPConnection, self).__init__(
+            parameters=self._connection_params)
+
+
+
 class ExchangeTypes(object):
     """AMQP Exchange Types."""
     Topic = 'topic'
@@ -194,17 +208,6 @@ class Credentials(pika.PlainCredentials):
 
         """
         super(Credentials, self).__init__(username=username, password=password)
-
-
-class SharedConnection(pika.BlockingConnection):
-    """Shared Connection."""
-
-    def __init__(self, connection_params):
-        """Constructor."""
-        self._connection_params = connection_params
-        self._pika_connection = None
-        super(SharedConnection,
-              self).__init__(parameters=self._connection_params)
 
 
 class AMQPTransportSync(object):
@@ -240,9 +243,6 @@ class AMQPTransportSync(object):
             self.connection_params.credentials = self.credentials
         else:
             self.credentials = self.connection_params.credentials
-
-        if 'connection' in kwargs:
-            self._connection = kwargs.pop('connection')
 
         # So that connections do not go zombie
         atexit.register(self._graceful_shutdown)
@@ -287,7 +287,7 @@ class AMQPTransportSync(object):
                         self.connection_params.vhost))
             self.logger.debug('Connection parameters:')
             self.logger.debug(self.connection_params)
-            self._connection = SharedConnection(self.connection_params)
+            self._connection = AMQPConnection(self.connection_params)
             # Create a new communication channel
             self._channel = self._connection.channel()
             self.logger.info(
