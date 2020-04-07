@@ -34,20 +34,43 @@ import uuid
 import json
 import threading
 
-from .amqp_transport import (AMQPTransportSync, ExchangeTypes,
-                             MessageProperties)
+from .amqp_transport import (
+    AMQPTransportSync, ExchangeTypes, MessageProperties
+)
+
+from .serializer import JSONSerializer, ContentType
+from .msg import Message
 
 
 class RpcServer(AMQPTransportSync):
-    def __init__(self, rpc_name, exchange='', on_request=None, *args,
+    """AMQP RPC Server implementation"""
+
+    _SERIALIZER = JSONSerializer
+
+    def __init__(self,
+                 rpc_name,
+                 exchange='',
+                 on_request=None,
+                 serializer=None,
+                 *args,
                  **kwargs):
         """Constructor.
 
         @param rpc_name: The name of the RPC
-        @type rpc_name: string
+        @type rpc_name: str
+
+        @param exchange: The RPC exchange. Defaults to '' (Default exchange)
+        @type exchange: str
+
+        @param on_request: RPC callback. onrequest(msg, meta)
+        @type on_request: function
         """
         self._name = rpc_name
         self._rpc_name = rpc_name
+
+        if serializer is not None:
+            self._SERIALIZER = serializer
+
         AMQPTransportSync.__init__(self, *args, **kwargs)
         self._exchange = exchange
         # Bind on_request callback
@@ -82,12 +105,6 @@ class RpcServer(AMQPTransportSync):
         self.loop_thread = threading.Thread(target=self.run)
         self.loop_thread.daemon = True
         self.loop_thread.start()
-        # self.connection.add_callback_threadsafe(
-        #         functools.partial(self._consume))
-        # self.connection.add_callback_threadsafe(
-        #         functools.partial(self._channel.start_consuming))
-        # self.connection.add_callback_threadsafe(
-        #         functools.partial(self.run))
 
     def run_async(self):
         self._consume()
@@ -99,73 +116,102 @@ class RpcServer(AMQPTransportSync):
         self.logger.info('[x] - RPC Endpoint ready: {}'.format(self._rpc_name))
 
     def _on_request_wrapper(self, ch, method, properties, body):
+        msg = {}
+        _ctype = None
+        _cencoding = None
+        _ts_send = None
+        _ts_broker = None
+        _dmode = None
         try:
-            msg = self._deserialize_data(body)
-            meta = {'channel': ch, 'method': method, 'properties': properties}
-            if self.on_request is not None:
-                resp = self.on_request(msg, meta)
-            else:
-                resp = {'error': 'Not Implemented'}
+            _ctype = properties.content_type
+            _cencoding = properties.content_encoding
+            _ts_broker = properties.headers['timestamp_in_ms']
+            _dmode = properties.delivery_mode
+            _ts_send = properties.timestamp
+            # _ts_broker = properties.timestamp
+
+            _msg = self._deserialize_data(body, _ctype, _cencoding)
+        except Exception:
+            self.logger.error("Could not deserialize data",
+                              exc_info=True)
+            # Return data as is. Let callback handle with encoding...
+            _msg = body
+
+        if self.on_request is not None:
+            _meta = {
+                'channel': ch,
+                'method': method,
+                'properties': {
+                    'content_type': _ctype,
+                    'content_encoding': _cencoding,
+                    'timestamp_broker': _ts_broker,
+                    'timestamp_producer': _ts_send,
+                    'delivery_mode': _dmode
+                }
+            }
+            resp = self.on_request(_msg, _meta)
+        else:
+            resp = {
+                'error': 'Not Implemented',
+                'status': 501
+            }
+
+        try:
+            _payload = None
+            _encoding = None
+            _type = None
+
+            if isinstance(resp, dict):
+                _payload = self._SERIALIZER.serialize(resp).encode('utf-8')
+                _encoding = self._SERIALIZER.CONTENT_ENCODING
+                _type = self._SERIALIZER.CONTENT_TYPE
+            elif isinstance(data, str):
+                _type = 'text/plain'
+                _encoding = 'utf8'
+                _payload = data
+            elif isinstance(msg, bytes):
+                _type = 'application/octet-stream'
+                _encoding = 'utf8'
+                _payload = data
+
         except Exception as e:
-            self.logger.exception('')
-            resp = {'error': str(e)}
-        if resp is None:
-            resp = {}
+            self.logger.error("Could not deserialize data",
+                              exc_info=True)
+            _payload = {
+                'status': 501,
+                'error': 'Internal server error: {}'.format(str(e))
+            }
 
-        _data, _ctype, _encoding = self._parse_resp(resp)
-
-        msg_props = MessageProperties(
-            correlation_id=properties.correlation_id,
-            content_type=_ctype,
+        _msg_props = MessageProperties(
+            content_type=_type,
             content_encoding=_encoding,
-            timestamp=(1.0 * (time.time() + 0.5) * 1000),
-            message_id=0,
-            # user_id="",
-            # app_id="",
         )
 
         ch.basic_publish(
             exchange=self._exchange,
             routing_key=properties.reply_to,
-            properties=msg_props,
-            body=_data)
-        # Acknowledge receivving the message.
+            properties=_msg_props,
+            body=_payload)
+        # Acknowledge receiving the message.
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def _parse_resp(self, data):
+    def _deserialize_data(self, data, content_type, content_encoding):
         """
-        Dummy at the moment. Only check if it is of type dictionary.
-        """
-        _d = ""
-        _ctype = ""
-        _encoding = 'utf8'
-        if isinstance(data, dict):
-            _d = json.dumps(data)
-            _ctype = 'application/json'
-        elif isinstance(data, str):
-            _d = data
-            _ctype = 'text/plain'
-        elif isinstance(data, unicode):
-            _d = data
-            _ctype = 'text/plain'
-        else:
-            raise TypeError('Msg should be either string of dict')
-        return _d, _ctype, _encoding
-
-
-    def _deserialize_data(self, data):
-        """
-        DeSerialize data.
+        Deserialize wire data.
 
         @param data: Data to deserialize.
         @type data: dict|int|bool
         """
-        _d = {}
-        try:
-            _d = json.loads(data)
-        except Exception:
-            _d = data
-        return _d
+        _data = None
+        if content_encoding is None:
+            content_encoding = 'utf8'
+        if content_type == ContentType.json:
+            _data = JSONSerializer.deserialize(data)
+        elif content_type == ContentType.text:
+            _data = data.decode(content_encoding)
+        elif content_type == ContentType.raw_bytes:
+            _data = data
+        return _data
 
     def close(self):
         if not self._channel:
@@ -189,6 +235,9 @@ class RpcServer(AMQPTransportSync):
 
 
 class RpcClient(AMQPTransportSync):
+    """AMQP RPC Client Implementation."""
+    _SERIALIZER = JSONSerializer
+
     def __init__(self, rpc_name, *args, **kwargs):
         """
         Constructor.
@@ -205,6 +254,7 @@ class RpcClient(AMQPTransportSync):
         self._exchange = ExchangeTypes.Default
         self._mean_delay = 0
         self._delay = 0
+        self.onresponse = None
 
         self._consumer_tag = self._channel.basic_consume(
             'amq.rabbitmq.reply-to',
@@ -221,98 +271,128 @@ class RpcClient(AMQPTransportSync):
     def delay(self):
         return self._delay
 
-    def _on_response(self, ch, method, props, body):
-        """Handle on-response event."""
-        self.logger.debug(
-            'Received Response:' + '\n- [*] Body: %s' + '\n- [*] Method: %s' +
-            '\n- [*] Properties: %s' + '\n- [*] Channel: %s', body, method,
-            props, ch)
+    def _on_response(self, ch, method, properties, body):
+        _ctype = None
+        _cencoding = None
+        _ts_send = None
+        _ts_broker = None
+        _dmode = None
+        _msg = None
+        _meta = None
+        try:
+            _ctype = properties.content_type
+            _cencoding = properties.content_encoding
+            _ts_broker = properties.headers['timestamp_in_ms']
+            _dmode = properties.delivery_mode
+            _ts_send = properties.timestamp
 
-        self._response = body
+            _meta = {
+                'channel': ch,
+                'method': method,
+                'properties': {
+                    'content_type': _ctype,
+                    'content_encoding': _cencoding,
+                    'timestamp_broker': _ts_broker,
+                    'timestamp_producer': _ts_send,
+                    'delivery_mode': _dmode
+                }
+            }
+        except Exception:
+            self.logger.error("Error parsing response from rpc server.",
+                              exc_info=True)
+
+        try:
+            _msg = self._deserialize_data(body, _ctype, _cencoding)
+        except Exception:
+            self.logger.error("Could not deserialize data",
+                              exc_info=True)
+            _msg = body
+
+        self._response = _msg
+        self._response_meta = _meta
+
+        if self.onresponse is not None:
+            self.onresponse(_msg, _meta)
 
     def gen_corr_id(self):
         """Generate correlationID."""
         return str(uuid.uuid4())
 
-    def call(self, msg, background=False, immediate=False, timeout=5.0):
+    def call(self, msg, timeout=5.0):
         """Call RPC."""
-        data, ctype, encoding = self._parse_msg(msg)
         self._response = None
         self._corr_id = self.gen_corr_id()
-        try:
-            # Direct reply-to implementation
-            rpc_props = MessageProperties(
-                content_type=ctype,
-                content_encoding=encoding,
-                timestamp=(1.0 * (time.time() + 0.5) * 1000),
-                message_id=0,
-                # user_id="",
-                # app_id="",
-                reply_to='amq.rabbitmq.reply-to'
-            )
+        if isinstance(msg, Message):
+            data = msg.to_dict()
+        else:
+            data = msg
+        self._send_data(data)
+        start_t = time.time()
+        self._wait_for_response(timeout)
+        elapsed_t = time.time() - start_t
+        self._delay = elapsed_t
 
-            self._channel.basic_publish(
-                exchange=self._exchange,
-                routing_key=self._rpc_name,
-                mandatory=False,
-                properties=rpc_props,
-                body=data)
-
-            start_t = time.time()
-            self._wait_for_response(timeout)
-            elapsed_t = time.time() - start_t
-            self._delay = elapsed_t
-
-            if self._response is None:
-                resp = {'error': 'RPC Response timeout'}
-            else:
-                resp = self._deserialize_data(self._response)
-            return resp
-        except KeyboardInterrupt as e:
-            raise (e)
-        except Exception:
-            self.logger.exception('Exception thrown in rpc call')
-            return {}
+        if self._response is None:
+            resp = {'error': 'RPC Response timeout'}
+        else:
+            resp = self._response
+        return resp
 
     def _wait_for_response(self, timeout):
         self.logger.debug('Waiting for response from [%s]...', self._rpc_name)
         self._connection.process_data_events(time_limit=timeout)
 
-    def _deserialize_data(self, data):
+    def _deserialize_data(self, data, content_type, content_encoding):
         """
-        De-serialize data.
+        Deserialize wire data.
 
-        TODO: Make Deserialization classes. Maybe merge with serializatio
-            classes. Allow for different implementations.
-
-        @param data: Data to serialize.
+        @param data: Data to deserialize.
         @type data: dict|int|bool
         """
-        resp = None
-        try:
-            resp = json.loads(data)
-        except Exception:
-            resp = data
-        resp = data.decode()
-        return resp
+        _data = None
+        if content_encoding is None:
+            content_encoding = 'utf8'
+        if content_type == ContentType.json:
+            _data = JSONSerializer.deserialize(data)
+        elif content_type == ContentType.text:
+            _data = data.decode(content_encoding)
+        elif content_type == ContentType.raw_bytes:
+            _data = data
+        return _data
 
-    def _parse_msg(self, data):
-        """
-        Dummy at the moment. Only check if it is of type dictionary.
-        """
-        _raw = ""
-        _ctype = ""
-        _encoding = 'utf8'
+    def _send_data(self, data):
+        _payload = None
+        _encoding = None
+        _type = None
+
         if isinstance(data, dict):
-            _raw = json.dumps(data)
-            _ctype = 'application/json'
+            _payload = self._SERIALIZER.serialize(data).encode('utf-8')
+            _encoding = self._SERIALIZER.CONTENT_ENCODING
+            _type = self._SERIALIZER.CONTENT_TYPE
         elif isinstance(data, str):
-            _raw = data
-            _ctype = 'text/plain'
-        elif isinstance(data, unicode):
-            _raw = data
-            _ctype = 'text/plain'
-        else:
-            raise TypeError('Msg should be either string of dict')
-        return _raw, _ctype, _encoding
+            _type = 'text/plain'
+            _encoding = 'utf8'
+            _payload = data
+        elif isinstance(msg, bytes):
+            _type = 'application/octet-stream'
+            _encoding = 'utf8'
+            _payload = data
+
+        # Direct reply-to implementation
+        _rpc_props = MessageProperties(
+            content_type=_type,
+            content_encoding=_encoding,
+            # timestamp=(1.0 * (time.time() + 0.5) * 1000),
+            message_id=0,
+            # user_id="",
+            # app_id="",
+            reply_to='amq.rabbitmq.reply-to'
+        )
+
+        self._channel.basic_publish(
+            exchange=self._exchange,
+            routing_key=self._rpc_name,
+            mandatory=False,
+            properties=_rpc_props,
+            body=_payload)
 

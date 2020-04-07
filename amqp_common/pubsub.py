@@ -101,10 +101,7 @@ class PublisherSync(AMQPTransportSync):
         msg_props = MessageProperties(
             content_type=_type,
             content_encoding=_encoding,
-            # timestamp=(1.0 * (time.time() + 0.5) * 1000),
             message_id=0,
-            # user_id="",
-            # app_id="",
         )
 
         self._channel.basic_publish(
@@ -235,6 +232,11 @@ class SubscriberSync(AMQPTransportSync):
 
     def _on_msg_callback_wrapper(self, ch, method, properties, body):
         msg = {}
+        _ctype = None
+        _cencoding = None
+        _ts_send = None
+        _ts_broker = None
+        _dmode = None
         try:
             _ctype = properties.content_type
             _cencoding = properties.content_encoding
@@ -289,9 +291,7 @@ class SubscriberSync(AMQPTransportSync):
 
     def _deserialize_data(self, data, content_type, content_encoding):
         """
-        Deserialize data.
-
-        TODO: Make class. ALlow for different implementations.
+        Deserialize wire data.
 
         @param data: Data to deserialize.
         @type data: dict|int|bool

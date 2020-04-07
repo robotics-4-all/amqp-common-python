@@ -33,6 +33,17 @@ import pika
 from .r4a_logger import create_logger, LoggingLevel
 
 
+class RPCMeta(object):
+    __slots__ = [
+        'channel', 'method', 'properties'
+    ]
+
+    def __init__(self, channel=None, method=None, properties=None):
+        self.channel = channel
+        self.method = method
+        self.properties = properties
+
+
 class MessageProperties(pika.BasicProperties):
     def __init__(self,
                  content_type=None,
