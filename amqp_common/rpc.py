@@ -275,14 +275,17 @@ class RpcClient(AMQPTransportSync):
         _ctype = None
         _cencoding = None
         _ts_send = None
-        _ts_broker = None
+        _ts_broker = 0
         _dmode = None
         _msg = None
         _meta = None
         try:
             _ctype = properties.content_type
             _cencoding = properties.content_encoding
-            _ts_broker = properties.headers['timestamp_in_ms']
+            if hasattr(self, 'headers'):
+                if 'timestamp_in_ms' in properties.headers:
+                    _ts_broker = properties.headers['timestamp_in_ms']
+
             _dmode = properties.delivery_mode
             _ts_send = properties.timestamp
 
