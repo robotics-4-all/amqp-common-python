@@ -10,13 +10,46 @@ Thing wrapper around [pika](https://pika.readthedocs.io/en/stable/).
 
 
 ```bash
-python setup.py install --user
+python setup.py install
 ```
 
 or
 
 ```bash
 pip install . --user
+```
+
+
+# RPC Client
+
+In case of `RpcClient`, if the thread where it was created is blocked, then
+heartbeats wont be sent, leading to a connection drop from the broker.
+
+To avoid that, make sure you either invoke `call` or use the `process_amqp_events`
+member method to explicitly sent heartbeat messages within a `heartbeat_timeout`
+interval.
+
+
+## Usage
+
+```python
+import time
+
+from amqp_common import ConnectionParameters, RpcClient, Credentials
+
+
+if __name__ == "__main__":
+
+    conn_params = ConnectionParameters()
+    conn_params.credentials = Credentials('bot', 'bot')
+
+    rpc_client = RpcClient('test_rpc)',
+                           connection_params=conn_params)
+    data = {}
+    print('Calling RPC...')
+    resp = rpc_client.call(data, timeout=30)
+    print('Response: {}'.format(response))
+
 ```
 
 # Examples
