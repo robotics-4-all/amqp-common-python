@@ -31,10 +31,7 @@ class MyRpcServer(amqp_common.RpcServer):
 
 
 def callback(msg, meta):
-    print('Received request: \nMessage -> {}\nProperties -> {}'.format(
-        msg, meta['properties']))
-    print('Channel ---> ', meta['channel'])
-    print('Method ---> ', meta['method'])
+    print('RPC Server call')
     return msg
 
 
@@ -86,8 +83,7 @@ if __name__ == "__main__":
     conn_params = amqp_common.ConnectionParameters(
         host=host, port=port, vhost=vhost)
     conn_params.credentials = amqp_common.Credentials(username, password)
-    conn = amqp_common.SharedConnection(conn_params)
 
     rpc_server = amqp_common.RpcServer(
-        rpc_name, on_request=callback, connection=conn)
+        rpc_name, on_request=callback, connection_params=conn_params)
     rpc_server.run()
