@@ -129,7 +129,11 @@ class RpcServer(AMQPTransportSync):
             _dmode = properties.delivery_mode
             _ts_send = properties.timestamp
             # _ts_broker = properties.timestamp
+        except Exception:
+            self.logger.error("Could not calculate latency",
+                              exc_info=True)
 
+        try:
             _msg = self._deserialize_data(body, _ctype, _cencoding)
         except Exception:
             self.logger.error("Could not deserialize data",
@@ -310,6 +314,7 @@ class RpcClient(AMQPTransportSync):
             self.logger.error("Could not deserialize data",
                               exc_info=True)
             _msg = body
+
 
         self._response = _msg
         self._response_meta = _meta
