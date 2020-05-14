@@ -16,9 +16,10 @@ if __name__ == "__main__":
 
     rpc_client = RpcClient('test_rpc_client_blocked',
                            connection_params=conn_params)
-    print('Sleep...')
-    time.sleep(180)
     data = {}
-    print('Calling RPC')
-    resp = rpc_client.call(data, timeout=30)
-    print('Response: {}'.format(response))
+    while True:
+        print('Calling RPC')
+        resp = rpc_client.call(data, timeout=30)
+        print('Response: {}'.format(resp))
+        time.sleep(2)
+        rpc_client.process_amqp_events()

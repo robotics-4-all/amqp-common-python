@@ -95,11 +95,6 @@ class RpcServer(AMQPTransportSync):
         except Exception as exc:
             self.logger.error(exc, exc_info=True)
 
-    def process_amqp_events(self):
-        self.connection.process_data_events()
-        # self.conection.add_callback_threadsafe(
-        #         functools.partial(self.connection.process_data_events))
-
     def run_threaded(self):
         """Run RPC Server in a separate thread."""
         self.loop_thread = threading.Thread(target=self.run)
