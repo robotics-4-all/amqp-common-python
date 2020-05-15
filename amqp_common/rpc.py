@@ -94,6 +94,7 @@ class RpcServer(AMQPTransportSync):
             self._channel.start_consuming()
         except Exception as exc:
             self.logger.error(exc, exc_info=True)
+            raise exc
 
     def run_threaded(self):
         """Run RPC Server in a separate thread."""
