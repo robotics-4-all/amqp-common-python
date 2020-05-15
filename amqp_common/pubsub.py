@@ -229,6 +229,9 @@ class SubscriberSync(AMQPTransportSync):
         except KeyboardInterrupt as exc:
             # Log error with traceback
             self.logger.error(exc, exc_info=True)
+        except Exception as exc:
+            self.logger.error(exc, exc_info=True)
+            raise exc
 
     def _on_msg_callback_wrapper(self, ch, method, properties, body):
         msg = {}

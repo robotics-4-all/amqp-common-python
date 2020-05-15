@@ -94,11 +94,7 @@ class RpcServer(AMQPTransportSync):
             self._channel.start_consuming()
         except Exception as exc:
             self.logger.error(exc, exc_info=True)
-
-    def process_amqp_events(self):
-        self.connection.process_data_events()
-        # self.conection.add_callback_threadsafe(
-        #         functools.partial(self.connection.process_data_events))
+            raise exc
 
     def run_threaded(self):
         """Run RPC Server in a separate thread."""
@@ -129,7 +125,11 @@ class RpcServer(AMQPTransportSync):
             _dmode = properties.delivery_mode
             _ts_send = properties.timestamp
             # _ts_broker = properties.timestamp
+        except Exception:
+            self.logger.error("Could not calculate latency",
+                              exc_info=True)
 
+        try:
             _msg = self._deserialize_data(body, _ctype, _cencoding)
         except Exception:
             self.logger.error("Could not deserialize data",
@@ -310,6 +310,7 @@ class RpcClient(AMQPTransportSync):
             self.logger.error("Could not deserialize data",
                               exc_info=True)
             _msg = body
+
 
         self._response = _msg
         self._response_meta = _meta

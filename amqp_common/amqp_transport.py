@@ -317,6 +317,9 @@ class AMQPTransportSync(object):
             raise (exc)
         return self._channel
 
+    def process_amqp_events(self):
+        self.connection.process_data_events()
+
     def _signal_handler(self, signum, frame):
         self.logger.info('Signal received: ', signum)
         self._graceful_shutdown()
