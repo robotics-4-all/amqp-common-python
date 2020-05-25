@@ -45,24 +45,18 @@ class RPCMeta(object):
 
 
 class MessageProperties(pika.BasicProperties):
-    def __init__(self,
-                 content_type=None,
-                 content_encoding=None,
-                 timestamp=None,
-                 correlation_id=None,
-                 reply_to=None,
-                 message_id=None,
-                 user_id=None,
-                 app_id=None):
-        """Message Properties/Attribures used for sending and receiving messages.
+    """Message Properties/Attribures used for sending and receiving messages.
 
-        @param content_type:
+    Args:
+        content_type (str):
+        content_encoding (str):
+        timestamp (str):
 
-        @param content_encoding:
-
-        @param timestamp
-
-        """
+    """
+    def __init__(self, content_type=None, content_encoding=None,
+                 timestamp=None, correlation_id=None, reply_to=None,
+                 message_id=None, user_id=None, app_id=None):
+        """Constructor."""
         if timestamp is None:
             timestamp = (time.time() + 0.5) * 1000
         timestamp = int(timestamp)
@@ -79,67 +73,43 @@ class MessageProperties(pika.BasicProperties):
 
 
 class ConnectionParameters(pika.ConnectionParameters):
-    """AMQP Connection parameters."""
+    """AMQP Connection parameters.
+
+    Args:
+        host (str): Hostname of AMQP broker to connect to.
+        port (int|str): AMQP broker listening port.
+        creds (object): Auth Credentials - Credentials instance.
+        secure (bool): Enable SSL/TLS (AMQPS) - Not supported!!
+        reconnect_attempts (int): The reconnection attempts to make before
+            droping and raising an Exception.
+        retry_delay (float): Time delay between reconnect attempts.
+        timeout (float): Socket Connection timeout value.
+        timeout (float): Blocked Connection timeout value.
+            Set the timeout, in seconds, that the connection may remain blocked
+            (triggered by Connection.Blocked from broker). If the timeout
+            expires before connection becomes unblocked, the connection will
+            be torn down.
+        heartbeat_timeout (int): Controls AMQP heartbeat
+            timeout negotiation during connection tuning. An integer value
+            always overrides the value proposed by broker. Use 0 to deactivate
+            heartbeats and None to always accept the broker's proposal.
+            The value passed for timeout is also used to calculate an interval
+            at which a heartbeat frame is sent to the broker. The interval is
+            equal to the timeout value divided by two.
+        channel_max (int): The max permissible number of channels per
+            connection. Defaults to 128.
+    """
 
     __slots__ = [
         'host', 'port', 'secure', 'vhost', 'reconnect_attempts', 'retry_delay',
         'timeout', 'heartbeat_timeout', 'blocked_connection_timeout', 'creds'
     ]
 
-    def __init__(self,
-                 host='127.0.0.1',
-                 port='5672',
-                 creds=None,
-                 secure=False,
-                 vhost='/',
-                 reconnect_attempts=5,
-                 retry_delay=2.0,
-                 timeout=120,
-                 blocked_connection_timeout=None,
-                 heartbeat_timeout=60,
-                 channel_max=128):
-        """
-        Constructor.
-
-        @param host: Hostname of AMQP broker to connect to.
-        @type host: string
-
-        @param port: AMQP broker listening port.
-        @type port: string
-
-        @param creds: AUth Credentials.
-        @type creds: Credentials
-
-        @param secure: Enable SSL/TLS (AMQPS) - Not used!!
-        @type secure: boolean
-
-        @param reconnect_attempts: TODO
-        @type reconnect_attempts: int
-
-        @param retry_delay: Time delay between reconnect attempts.
-        @type retry_delay: float
-
-        @param timeout: Socket Connection timeout value.
-        @type timeout: float
-
-        @param timeout: Blocked Connection timeout value.
-            Set the timeout, in seconds, that the connection may remain blocked
-            (triggered by Connection.Blocked from broker). If the timeout expires
-            before connection becomes unblocked, the connection will be torn down.
-        @type timeout: float
-
-        @param heartbeat_timeout: Controls AMQP heartbeat timeout negotiation
-            during connection tuning. An integer value always overrides the value
-            proposed by broker. Use 0 to deactivate heartbeats and None to always
-            accept the broker's proposal. The value passed for timeout is also
-            used to calculate an interval at which a heartbeat frame is sent to
-            the broker. The interval is equal to the timeout value divided by two.
-        @type heartbeat_timeout: int
-
-        @param channel_max: The max permissible number of channels per connection.
-            Defaults to 128
-        @type channel_max: int
-        """
+    def __init__(self, host='127.0.0.1', port='5672', creds=None,
+                 secure=False, vhost='/', reconnect_attempts=5,
+                 retry_delay=2.0, timeout=120, blocked_connection_timeout=None,
+                 heartbeat_timeout=60, channel_max=128):
+        """Constructor."""
         self.host = host
         self.port = port
         self.secure = secure
@@ -202,30 +172,28 @@ class ExchangeTypes(object):
 
 class Credentials(pika.PlainCredentials):
     """Connection credentials for authn/authz.
-    TODO: Inherit from pika.PlainCredentials
+
+    Args:
+        username (str): The username.
+        password (str): The password (Basic Authentication).
     """
 
     __slots__ = ['username', 'password']
 
     def __init__(self, username='guest', password='guest'):
-        """
-        Constructor.
-
-        @param username: Client username to login
-        @type username: string
-
-        @param password: Client password
-        @type password: string
-
-        """
+        """Constructor."""
         super(Credentials, self).__init__(username=username, password=password)
 
 
 class AMQPTransportSync(object):
-    """Broker Interface."""
+    """Broker Interface.
+
+    Implements commonly used functionalities. Base class of high-level
+        implementations such as SubscriberSync and RpcServer.
+    """
 
     def __init__(self, *args, **kwargs):
-        """TODO."""
+        """Constructor."""
         self._connection = None
         self._channel = None
         self._closing = False
@@ -318,6 +286,7 @@ class AMQPTransportSync(object):
         return self._channel
 
     def process_amqp_events(self):
+        """Force process amqp events, such as heartbeat packages."""
         self.connection.process_data_events()
 
     def _signal_handler(self, signum, frame):

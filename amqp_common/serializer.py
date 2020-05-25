@@ -27,12 +27,14 @@ import json
 
 
 class ContentType(object):
+    """Content Types."""
     json = 'application/json'
     raw_bytes = 'application/octet-stream'
     text = 'plain/text'
 
 
 class Serializer(object):
+    """Serializer Abstract Class."""
     CONTENT_TYPE = 'None'
     CONTENT_ENCODING = 'None'
 
@@ -51,6 +53,10 @@ class Serializer(object):
 
 
 class JSONSerializer(Serializer):
+    """Thin wrapper to implement json serializer.
+
+    Static class.
+    """
     CONTENT_TYPE = 'application/json'
     CONTENT_ENCODING = 'utf8'
 

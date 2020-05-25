@@ -15,6 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import (
+    absolute_import,
+    division,
+    print_function,
+    unicode_literals
+)
+
 import time
 from os import path
 import json
@@ -56,13 +63,24 @@ class Message(object):
             setattr(self, key, val)
 
     def serialize_json(self):
+        """Serialize Message to json string.
+
+        Returns:
+            [str]: String List.
+        """
         _d = self._to_dict()
         return json.dumps(_d)
 
     def serialize_bytes(self):
+        """Serialize Message to bytes.
+
+        Returns:
+            [byte]: Byte List.
+        """
         return json.dumps(self._to_dict()).encode('utf-8')
 
     def to_dict(self):
+        """Serialize Message to dictionary."""
         return self._to_dict()
 
     def _deserialize_from_json_string(self, data_str):
@@ -77,7 +95,7 @@ class Message(object):
 
 
 class HeaderMessage(Message):
-    """Header message class."""
+    """Implementation of the Header Message object."""
 
     __slots__ = ['seq', 'timestamp', 'sender_id']
 
@@ -92,15 +110,22 @@ class HeaderMessage(Message):
 
 
 class FileMessage(Message):
+    """Implementation of the File Message object."""
 
     __slots__ = ['filename', 'header', 'data']
 
     def __init__(self, filename='', data=[]):
+        """Constructor."""
         self.filename = filename
         self.data = data
         self.header = HeaderMessage()
 
     def load_from_file(self, filepath):
+        """Load raw bytes from file.
+
+        Args:
+            filepath (str): System Path of the file.
+        """
         with open(filepath, 'rb') as f:
             fdata = f.read()
             b64 = base64.b64encode(fdata)
