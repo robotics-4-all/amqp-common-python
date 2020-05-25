@@ -43,7 +43,7 @@ if __name__ == "__main__":
     conn_params = ConnectionParameters()
     conn_params.credentials = Credentials('bot', 'bot')
 
-    rpc_client = RpcClient('test_rpc)',
+    rpc_client = RpcClient('test_rpc',
                            connection_params=conn_params)
     data = {}
     print('Calling RPC...')
@@ -51,6 +51,42 @@ if __name__ == "__main__":
     print('Response: {}'.format(response))
 
 ```
+
+# EventEmitter
+
+The `EventEmitter` class implements an event-based approach of communication.
+It uses a dedicated exchange and fires `Event` objects at specific URIs.
+An `Event` is defined by a name, the payload and headers. The relation
+between an event name and the uri is direct.
+
+Furthermore, the `EventEmitterOption` class can be used to configure
+the `EventEmitter`, such as the publishing exchange.
+
+## Usage
+
+```python
+# Uses amqp.event exchange by default. This is of type Topic
+options = amqp_common.EventEmitterOptions()
+
+event_em = amqp_common.EventEmitter(
+    options,
+    connection_params=amqp_common.ConnectionParameters(
+        host=host, port=port, vhost=vhost),
+    creds=amqp_common.Credentials(username, password),
+    debug=debug
+)
+
+event = amqp_common.Event(name=event_id,
+                          payload={'a': 1},
+                          headers={'b': 1}
+                          )
+rate = amqp_common.Rate(hz)
+while True:
+    # Publish once
+    event_em.send_event(event)
+    rate.sleep()
+```
+
 
 # Examples
 
