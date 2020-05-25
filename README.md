@@ -52,9 +52,9 @@ if __name__ == "__main__":
 
 ```
 
-# EventEmmiter
+# EventEmitter
 
-The `EventEmitter` object implements an event-based approach of communication.
+The `EventEmitter` class implements an event-based approach of communication.
 It uses a dedicated exchange and fires `Event` objects at specific URIs.
 An `Event` is defined by a name, the payload and headers. The relation
 between an event name and the uri is direct.
