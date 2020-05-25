@@ -31,23 +31,20 @@ from .serializer import JSONSerializer, ContentType
 
 
 class PublisherSync(AMQPTransportSync):
-    """Publisher Implementation"""
+    """Publisher class.
+
+    Args:
+        topic (str): The topic uri to publish data.
+        exchange (str): The exchange to publish data.
+        **kwargs: The keyword arguments to pass to the base class
+            (AMQPTransportSync).
+    """
 
     _SERIALIZER = JSONSerializer
 
-    def __init__(self,
-                 topic,
-                 exchange='amq.topic',
-                 serializer=None,
-                 *args,
-                 **kwargs):
-        """
-        Constructor.
-
-        @param topic: Topic name to publish
-        @type topic: string
-
-        """
+    def __init__(self, topic, exchange='amq.topic', serializer=None,
+                 *args, **kwargs):
+        """Constructor."""
         self._topic_exchange = exchange
         self._topic = topic
         self._name = topic
@@ -58,15 +55,10 @@ class PublisherSync(AMQPTransportSync):
         self.create_exchange(self._topic_exchange, ExchangeTypes.Topic)
 
     def publish(self, msg, thread_safe=True):
-        """
-        Publish message once.
-        TODO: 1) Add message publishing timestamp
-              2) Add Content-Type (handled at the application layer)
-              3) Add Content-Encoding (handled at the application layer)
+        """ Publish message once.
 
-        @param msg: Message to publish.
-        @type msg: dict
-
+        Args:
+            msg (dict|Message|str|bytes): Message/Data to publish.
         """
         if isinstance(msg, Message):
             data = msg.to_dict()
@@ -112,15 +104,11 @@ class PublisherSync(AMQPTransportSync):
         self.logger.debug('Sent message to topic <{}>'.format(self._topic))
 
     def pub_loop(self, data_bind, hz):
-        """
-        Publish message frequenntly.
+        """Publish message frequenntly.
 
-        @param data_bind: Bind to data for publishing.
-        @type data_bind: dict
-
-        @param hz: Publishing frequency.
-        @type hz: float
-
+        Args:
+            data_bind: Pass reference to the data to bind.
+            hz (float): Publishing frequency.
         """
         if hz == 0.0:  # Publish once and return
             self.publish(data_bind)
@@ -139,31 +127,28 @@ class PublisherSync(AMQPTransportSync):
 
 
 class SubscriberSync(AMQPTransportSync):
-    """Subscriber implementation in AMQP protocol."""
+    """Subscriber class.
+    Implements the Subscriber endpoint of the PubSub communication pattern.
+
+    Args:
+        topic (str): The topic uri.
+        on_message (function): The callback function. This function
+            is fired when messages arrive at the registered topic.
+        exchange (str): The name of the exchange. Defaults to `amq.topic`
+        queue_size (int): The maximum queue size of the topic.
+        message_ttl (int): Message Time-to-Live as specified by AMQP.
+        overflow (str): queue overflow behavior. Specified by AMQP Protocol.
+            Defaults to `drop-head`.
+        **kwargs: The keyword arguments to pass to the base class
+            (AMQPTransportSync).
+    """
 
     FREQ_CALC_SAMPLES_MAX = 100
 
-    def __init__(self,
-                 topic,
-                 on_message=None,
-                 exchange='amq.topic',
-                 queue_size=10,
-                 message_ttl=60000,
-                 overflow='drop-head',
-                 *args,
-                 **kwargs):
-        """
-        Constructor.
-
-        @param topic: The name of the (virtual) Topic.
-        @type: string
-
-        @param on_message: Function to execute when on-message event fires.
-        @type on_message: function
-
-        @param connection_params: AMQP Connection Parameters
-        @type connection_params: ConnectionParameters
-        """
+    def __init__(self, topic, on_message=None, exchange='amq.topic',
+                 queue_size=10, message_ttl=60000, overflow='drop-head',
+                 *args, **kwargs):
+        """Constructor."""
         self._name = topic
         AMQPTransportSync.__init__(self, *args, **kwargs)
         self._topic = topic
@@ -201,7 +186,7 @@ class SubscriberSync(AMQPTransportSync):
         return self._hz
 
     def run(self):
-        """Start Subscriber."""
+        """Start Subscriber. Blocking method."""
         self._consume()
 
     def run_threaded(self):
@@ -218,7 +203,7 @@ class SubscriberSync(AMQPTransportSync):
         super(SubscriberSync, self).close()
 
     def _consume(self, reliable=False):
-        """Start AMQP consumer (aka Subscriber)."""
+        """Start AMQP consumer."""
         self._channel.basic_consume(
             self._queue_name,
             self._on_msg_callback_wrapper,

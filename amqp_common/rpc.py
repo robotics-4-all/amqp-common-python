@@ -43,28 +43,23 @@ from .msg import Message
 
 
 class RpcServer(AMQPTransportSync):
-    """AMQP RPC Server implementation"""
+    """AMQP RPC Server class.
+    Implements an AMQP RPC Server.
+
+    Args:
+        rpc_name (str): The name of the RPC.
+        exchange (str): The exchange to bind the RPC.
+            Defaults to (AMQT default).
+        on_request (function): The on-request callback function to register.
+        **kwargs: Keyword arguments for the constructor of the base class
+            (AMQPTransportSync).
+    """
 
     _SERIALIZER = JSONSerializer
 
-    def __init__(self,
-                 rpc_name,
-                 exchange='',
-                 on_request=None,
-                 serializer=None,
-                 *args,
-                 **kwargs):
-        """Constructor.
-
-        @param rpc_name: The name of the RPC
-        @type rpc_name: str
-
-        @param exchange: The RPC exchange. Defaults to '' (Default exchange)
-        @type exchange: str
-
-        @param on_request: RPC callback. onrequest(msg, meta)
-        @type on_request: function
-        """
+    def __init__(self, rpc_name, exchange='', on_request=None,
+                 serializer=None, *args, **kwargs):
+        """Constructor. """
         self._name = rpc_name
         self._rpc_name = rpc_name
 
@@ -77,6 +72,7 @@ class RpcServer(AMQPTransportSync):
         self.on_request = on_request
 
     def is_alive(self):
+        """Returns True if connection is alive and False otherwise."""
         if self.connection is None:
             return False
         elif self.connection.is_open:
@@ -85,7 +81,7 @@ class RpcServer(AMQPTransportSync):
             return False
 
     def run(self):
-        """."""
+        """Run RPC Server in normal mode. Blocking function."""
         self.connect()
         self._rpc_queue = self.create_queue(self._rpc_name)
         self._channel.basic_qos(prefetch_count=1, global_qos=False)
@@ -196,11 +192,12 @@ class RpcServer(AMQPTransportSync):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def _deserialize_data(self, data, content_type, content_encoding):
-        """
-        Deserialize wire data.
+        """Deserialize wire data.
 
-        @param data: Data to deserialize.
-        @type data: dict|int|bool
+        Args:
+            data: Data to deserialize.
+            content_encoding (str): The content encoding.
+            content_type (str): The content type. Defaults to `utf8`.
         """
         _data = None
         if content_encoding is None:
@@ -214,6 +211,9 @@ class RpcServer(AMQPTransportSync):
         return _data
 
     def close(self):
+        """Stop RPC Server.
+        Safely close channel and connection to the broker.
+        """
         if not self._channel:
             return
         if self._channel.is_closed:
@@ -225,6 +225,9 @@ class RpcServer(AMQPTransportSync):
         return True
 
     def stop(self):
+        """Stop RPC Server.
+        Safely close channel and connection to the broker.
+        """
         return self.close()
 
     def __del__(self):
@@ -235,16 +238,17 @@ class RpcServer(AMQPTransportSync):
 
 
 class RpcClient(AMQPTransportSync):
-    """AMQP RPC Client Implementation."""
+    """AMQP RPC Client class.
+
+    Args:
+        rpc_name (str): The name of the RPC.
+        **kwargs: The Keyword arguments to pass to  the base class
+            (AMQPTransportSync).
+    """
     _SERIALIZER = JSONSerializer
 
     def __init__(self, rpc_name, *args, **kwargs):
-        """
-        Constructor.
-
-        @param rpc_name: The name of the RPC
-        @type rpc_name: string
-        """
+        """Constructor."""
         self._name = rpc_name
         self._rpc_name = rpc_name
         AMQPTransportSync.__init__(self, *args, **kwargs)
@@ -265,10 +269,14 @@ class RpcClient(AMQPTransportSync):
 
     @property
     def mean_delay(self):
+        """The mean delay of the communication. Internally calculated."""
         return self._mean_delay
 
     @property
     def delay(self):
+        """The last recorded delay of the communication.
+            Internally calculated.
+        """
         return self._delay
 
     def _on_response(self, ch, method, properties, body):
@@ -323,7 +331,13 @@ class RpcClient(AMQPTransportSync):
         return str(uuid.uuid4())
 
     def call(self, msg, timeout=5.0):
-        """Call RPC."""
+        """Call RPC.
+
+        Args:
+            msg (dict|Message): The message to send.
+            timeout (float): Response timeout. Set this value carefully
+                based on application criteria.
+        """
         self._response = None
         self._corr_id = self.gen_corr_id()
         if isinstance(msg, Message):
@@ -347,11 +361,12 @@ class RpcClient(AMQPTransportSync):
         self._connection.process_data_events(time_limit=timeout)
 
     def _deserialize_data(self, data, content_type, content_encoding):
-        """
-        Deserialize wire data.
+        """Deserialize wire data.
 
-        @param data: Data to deserialize.
-        @type data: dict|int|bool
+        Args:
+            data: Data to deserialize.
+            content_encoding (str): The content encoding.
+            content_type (str): The content type. Defaults to `utf8`
         """
         _data = None
         if content_encoding is None:
