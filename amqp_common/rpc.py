@@ -80,11 +80,13 @@ class RpcServer(AMQPTransportSync):
         else:
             return False
 
-    def run(self):
+    def run(self, raise_if_exists=True):
         """Run RPC Server in normal mode. Blocking function."""
         self.connect()
-        if self._rpc_exists():
-            raise ValueError('RPC allready registered on broker.')
+        if self._rpc_exists() and raise_if_exists:
+            raise ValueError(
+                'RPC <{}> allready registered on broker.'.format(
+                    self._rpc_name))
         self._rpc_queue = self.create_queue(self._rpc_name)
         self._channel.basic_qos(prefetch_count=1, global_qos=False)
         self._consume()
@@ -94,8 +96,14 @@ class RpcServer(AMQPTransportSync):
             self.logger.error(exc, exc_info=True)
             raise exc
 
-    def run_threaded(self):
+    def run_threaded(self, raise_if_exists=True):
         """Run RPC Server in a separate thread."""
+        self.connect()
+        _exists = self._rpc_exists()
+        if _exists and raise_if_exists:
+            raise ValueError(
+                'RPC <{}> allready registered on broker.'.format(
+                    self._rpc_name))
         self.loop_thread = threading.Thread(target=self.run)
         self.loop_thread.daemon = True
         self.loop_thread.start()

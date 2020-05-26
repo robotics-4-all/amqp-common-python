@@ -333,12 +333,8 @@ class AMQPTransportSync(object):
         self.logger.debug('Created exchange: [name={}, type={}]'.format(
             exchange_name, exchange_type))
 
-    def create_queue(self,
-                     queue_name='',
-                     exclusive=True,
-                     queue_size=10,
-                     message_ttl=60000,
-                     overflow_behaviour='drop-head',
+    def create_queue(self, queue_name='', exclusive=True, queue_size=10,
+                     message_ttl=60000, overflow_behaviour='drop-head',
                      expires=600000):
         """
         Create a new queue.
@@ -393,10 +389,13 @@ class AMQPTransportSync(object):
         print(arg)
 
     def queue_exists(self, queue_name):
-        """
-        TODO.
+        """Check if a queue exists, given its name.
 
-        https://pika.readthedocs.io/en/stable/modules/channel.html#pika.channel.Channel.queue_declare
+        Args:
+            queue_name (str): The name of the queue.
+
+        Returns:
+            int: True if queue exists False otherwise.
         """
         # resp = self._channel.queue_declare(queue_name, passive=True,
         #                                    callback=self._queue_exists_clb)
@@ -431,6 +430,9 @@ class AMQPTransportSync(object):
             raise exc
 
     def close(self):
+        self._graceful_shutdown()
+
+    def disconnect(self):
         self._graceful_shutdown()
 
     def __del__(self):
