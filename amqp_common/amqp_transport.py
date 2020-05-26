@@ -389,13 +389,26 @@ class AMQPTransportSync(object):
     def delete_queue(self, queue_name):
         self._channel.queue_delete(queue=queue_name)
 
+    def _queue_exists_clb(self, arg):
+        print(arg)
+
     def queue_exists(self, queue_name):
         """
         TODO.
 
         https://pika.readthedocs.io/en/stable/modules/channel.html#pika.channel.Channel.queue_declare
         """
-        pass
+        # resp = self._channel.queue_declare(queue_name, passive=True,
+        #                                    callback=self._queue_exists_clb)
+        try:
+            resp = self._channel.queue_declare(queue_name, passive=True)
+        except pika.exceptions.ChannelClosedByBroker as exc:
+            self.connect()
+            if exc.reply_code == 404:  # Not Found
+                return False
+            else:
+                self.logger.warning('Queue exists <{}>'.format(queue_name))
+                return True
 
     def bind_queue(self, exchange_name, queue_name, bind_key):
         """
@@ -414,8 +427,8 @@ class AMQPTransportSync(object):
         try:
             self._channel.queue_bind(
                 exchange=exchange_name, queue=queue_name, routing_key=bind_key)
-        except Exception:
-            self.logger.exception()
+        except Exception as exc:
+            raise exc
 
     def close(self):
         self._graceful_shutdown()

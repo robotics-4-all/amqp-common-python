@@ -83,6 +83,8 @@ class RpcServer(AMQPTransportSync):
     def run(self):
         """Run RPC Server in normal mode. Blocking function."""
         self.connect()
+        if self._rpc_exists():
+            raise ValueError('RPC allready registered on broker.')
         self._rpc_queue = self.create_queue(self._rpc_name)
         self._channel.basic_qos(prefetch_count=1, global_qos=False)
         self._consume()
@@ -100,6 +102,9 @@ class RpcServer(AMQPTransportSync):
 
     def run_async(self):
         self._consume()
+
+    def _rpc_exists(self):
+        return self.queue_exists(self._rpc_name)
 
     def _consume(self):
         self.consumer_tag = self._channel.basic_consume(
