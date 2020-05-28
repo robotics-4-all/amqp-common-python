@@ -233,11 +233,15 @@ class SubscriberSync(AMQPTransportSync):
         try:
             _ctype = properties.content_type
             _cencoding = properties.content_encoding
-            _ts_broker = properties.headers['timestamp_in_ms']
             _dmode = properties.delivery_mode
+            _ts_broker = properties.headers['timestamp_in_ms']
             _ts_send = properties.timestamp
             # _ts_broker = properties.timestamp
+        except Exception:
+            self.logger.error("Could not calculate latency",
+                              exc_info=True)
 
+        try:
             msg = self._deserialize_data(body, _ctype, _cencoding)
         except Exception:
             self.logger.error("Could not deserialize data",
