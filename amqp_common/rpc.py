@@ -118,7 +118,7 @@ class RpcServer(AMQPTransportSync):
         self.consumer_tag = self._channel.basic_consume(
             self._rpc_queue,
             self._on_request_wrapper)
-        self.logger.info('[x] - RPC Endpoint ready: {}'.format(self._rpc_name))
+        self.logger.info('RPC Endpoint ready: {}'.format(self._rpc_name))
 
     def _on_request_wrapper(self, ch, method, properties, body):
         msg = {}
@@ -208,7 +208,7 @@ class RpcServer(AMQPTransportSync):
         """Deserialize wire data.
 
         Args:
-            data: Data to deserialize.
+            data (str|dict): Data to deserialize.
             content_encoding (str): The content encoding.
             content_type (str): The content type. Defaults to `utf8`.
         """
@@ -220,6 +220,9 @@ class RpcServer(AMQPTransportSync):
         elif content_type == ContentType.text:
             _data = data.decode(content_encoding)
         elif content_type == ContentType.raw_bytes:
+            _data = data
+        else:
+            self.logger.warning('Conent-Type was not set!')
             _data = data
         return _data
 
