@@ -121,7 +121,7 @@ class RpcServer(AMQPTransportSync):
         self.logger.info('RPC Endpoint ready: {}'.format(self._rpc_name))
 
     def _on_request_wrapper(self, ch, method, properties, body):
-        msg = {}
+        _msg = {}
         _ctype = None
         _cencoding = None
         _ts_send = None
@@ -146,6 +146,7 @@ class RpcServer(AMQPTransportSync):
             # Return data as is. Let callback handle with encoding...
             _msg = body
 
+
         if self.on_request is not None:
             _meta = {
                 'channel': ch,
@@ -158,6 +159,8 @@ class RpcServer(AMQPTransportSync):
                     'delivery_mode': _dmode
                 }
             }
+            self.logger.debug(_msg)
+            self.logger.debug(_meta)
             resp = self.on_request(_msg, _meta)
         else:
             resp = {
@@ -222,8 +225,11 @@ class RpcServer(AMQPTransportSync):
         elif content_type == ContentType.raw_bytes:
             _data = data
         else:
-            self.logger.warning('Conent-Type was not set!')
-            _data = data
+            self.logger.warning(
+                    'Content-Type was not set in headers or is invalid!' + \
+                            ' Deserializing using default JSON serializer')
+            ## TODO: Not the proper way!!!!
+            _data = JSONSerializer.deserialize(data)
         return _data
 
     def close(self):
