@@ -127,7 +127,9 @@ class RpcServer(AMQPTransportSync):
         _ts_send = None
         _ts_broker = None
         _dmode = None
+        _corr_id = None
         try:
+            _corr_id = properties.correlation_id
             _ctype = properties.content_type
             _cencoding = properties.content_encoding
             _ts_broker = properties.headers['timestamp_in_ms']
@@ -156,7 +158,8 @@ class RpcServer(AMQPTransportSync):
                     'content_encoding': _cencoding,
                     'timestamp_broker': _ts_broker,
                     'timestamp_producer': _ts_send,
-                    'delivery_mode': _dmode
+                    'delivery_mode': _dmode,
+                    'correlation_id': _corr_id
                 }
             }
             self.logger.debug(_msg)
@@ -197,6 +200,7 @@ class RpcServer(AMQPTransportSync):
         _msg_props = MessageProperties(
             content_type=_type,
             content_encoding=_encoding,
+            correlation_id=_corr_id
         )
 
         ch.basic_publish(
@@ -310,6 +314,9 @@ class RpcClient(AMQPTransportSync):
         _msg = None
         _meta = None
         try:
+            _corr_id = properties.correlation_id
+            if self.corr_id != _corr_id:
+                return
             _ctype = properties.content_type
             _cencoding = properties.content_encoding
             if hasattr(self, 'headers'):
@@ -361,7 +368,7 @@ class RpcClient(AMQPTransportSync):
                 based on application criteria.
         """
         self._response = None
-        self._corr_id = self.gen_corr_id()
+        self.corr_id = self.gen_corr_id()
         if isinstance(msg, Message):
             data = msg.to_dict()
         else:
@@ -369,6 +376,7 @@ class RpcClient(AMQPTransportSync):
         self._send_data(data)
         start_t = time.time()
         self._wait_for_response(timeout)
+        ## TODO: Validate correlation_id
         elapsed_t = time.time() - start_t
         self._delay = elapsed_t
 
@@ -423,6 +431,7 @@ class RpcClient(AMQPTransportSync):
         _rpc_props = MessageProperties(
             content_type=_type,
             content_encoding=_encoding,
+            correlation_id=self.corr_id,
             # timestamp=(1.0 * (time.time() + 0.5) * 1000),
             message_id=0,
             # user_id="",
