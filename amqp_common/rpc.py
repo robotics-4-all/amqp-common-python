@@ -273,18 +273,19 @@ class RpcClient(AMQPTransportSync):
     """
     _SERIALIZER = JSONSerializer
 
-    def __init__(self, rpc_name, *args, **kwargs):
+    def __init__(self, rpc_name, use_corr_id=False, *args, **kwargs):
         """Constructor."""
         self._name = rpc_name
         self._rpc_name = rpc_name
         AMQPTransportSync.__init__(self, *args, **kwargs)
         self.connect()
-        self._corr_id = None
+        self.corr_id = None
         self._response = None
         self._exchange = ExchangeTypes.Default
         self._mean_delay = 0
         self._delay = 0
         self.onresponse = None
+        self.use_corr_id = use_corr_id
 
         self._consumer_tag = self._channel.basic_consume(
             'amq.rabbitmq.reply-to',
@@ -314,9 +315,10 @@ class RpcClient(AMQPTransportSync):
         _msg = None
         _meta = None
         try:
-            _corr_id = properties.correlation_id
-            if self.corr_id != _corr_id:
-                return
+            if self.use_corr_id:
+                _corr_id = properties.correlation_id
+                if self.corr_id != _corr_id:
+                    return
             _ctype = properties.content_type
             _cencoding = properties.content_encoding
             if hasattr(self, 'headers'):
@@ -368,7 +370,8 @@ class RpcClient(AMQPTransportSync):
                 based on application criteria.
         """
         self._response = None
-        self.corr_id = self.gen_corr_id()
+        if self.use_corr_id:
+            self.corr_id = self.gen_corr_id()
         if isinstance(msg, Message):
             data = msg.to_dict()
         else:
