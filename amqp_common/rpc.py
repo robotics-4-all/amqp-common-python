@@ -118,16 +118,18 @@ class RpcServer(AMQPTransportSync):
         self.consumer_tag = self._channel.basic_consume(
             self._rpc_queue,
             self._on_request_wrapper)
-        self.logger.info('[x] - RPC Endpoint ready: {}'.format(self._rpc_name))
+        self.logger.info('RPC Endpoint ready: {}'.format(self._rpc_name))
 
     def _on_request_wrapper(self, ch, method, properties, body):
-        msg = {}
+        _msg = {}
         _ctype = None
         _cencoding = None
         _ts_send = None
         _ts_broker = None
         _dmode = None
+        _corr_id = None
         try:
+            _corr_id = properties.correlation_id
             _ctype = properties.content_type
             _cencoding = properties.content_encoding
             _ts_broker = properties.headers['timestamp_in_ms']
@@ -146,6 +148,7 @@ class RpcServer(AMQPTransportSync):
             # Return data as is. Let callback handle with encoding...
             _msg = body
 
+
         if self.on_request is not None:
             _meta = {
                 'channel': ch,
@@ -155,9 +158,12 @@ class RpcServer(AMQPTransportSync):
                     'content_encoding': _cencoding,
                     'timestamp_broker': _ts_broker,
                     'timestamp_producer': _ts_send,
-                    'delivery_mode': _dmode
+                    'delivery_mode': _dmode,
+                    'correlation_id': _corr_id
                 }
             }
+            self.logger.debug(_msg)
+            self.logger.debug(_meta)
             resp = self.on_request(_msg, _meta)
         else:
             resp = {
@@ -194,6 +200,7 @@ class RpcServer(AMQPTransportSync):
         _msg_props = MessageProperties(
             content_type=_type,
             content_encoding=_encoding,
+            correlation_id=_corr_id
         )
 
         ch.basic_publish(
@@ -208,7 +215,7 @@ class RpcServer(AMQPTransportSync):
         """Deserialize wire data.
 
         Args:
-            data: Data to deserialize.
+            data (str|dict): Data to deserialize.
             content_encoding (str): The content encoding.
             content_type (str): The content type. Defaults to `utf8`.
         """
@@ -221,6 +228,12 @@ class RpcServer(AMQPTransportSync):
             _data = data.decode(content_encoding)
         elif content_type == ContentType.raw_bytes:
             _data = data
+        else:
+            self.logger.warning(
+                    'Content-Type was not set in headers or is invalid!' + \
+                            ' Deserializing using default JSON serializer')
+            ## TODO: Not the proper way!!!!
+            _data = JSONSerializer.deserialize(data)
         return _data
 
     def close(self):
@@ -260,18 +273,19 @@ class RpcClient(AMQPTransportSync):
     """
     _SERIALIZER = JSONSerializer
 
-    def __init__(self, rpc_name, *args, **kwargs):
+    def __init__(self, rpc_name, use_corr_id=False, *args, **kwargs):
         """Constructor."""
         self._name = rpc_name
         self._rpc_name = rpc_name
         AMQPTransportSync.__init__(self, *args, **kwargs)
         self.connect()
-        self._corr_id = None
+        self.corr_id = None
         self._response = None
         self._exchange = ExchangeTypes.Default
         self._mean_delay = 0
         self._delay = 0
         self.onresponse = None
+        self.use_corr_id = use_corr_id
 
         self._consumer_tag = self._channel.basic_consume(
             'amq.rabbitmq.reply-to',
@@ -301,6 +315,10 @@ class RpcClient(AMQPTransportSync):
         _msg = None
         _meta = None
         try:
+            if self.use_corr_id:
+                _corr_id = properties.correlation_id
+                if self.corr_id != _corr_id:
+                    return
             _ctype = properties.content_type
             _cencoding = properties.content_encoding
             if hasattr(self, 'headers'):
@@ -352,7 +370,8 @@ class RpcClient(AMQPTransportSync):
                 based on application criteria.
         """
         self._response = None
-        self._corr_id = self.gen_corr_id()
+        if self.use_corr_id:
+            self.corr_id = self.gen_corr_id()
         if isinstance(msg, Message):
             data = msg.to_dict()
         else:
@@ -360,6 +379,7 @@ class RpcClient(AMQPTransportSync):
         self._send_data(data)
         start_t = time.time()
         self._wait_for_response(timeout)
+        ## TODO: Validate correlation_id
         elapsed_t = time.time() - start_t
         self._delay = elapsed_t
 
@@ -414,6 +434,7 @@ class RpcClient(AMQPTransportSync):
         _rpc_props = MessageProperties(
             content_type=_type,
             content_encoding=_encoding,
+            correlation_id=self.corr_id,
             # timestamp=(1.0 * (time.time() + 0.5) * 1000),
             message_id=0,
             # user_id="",
