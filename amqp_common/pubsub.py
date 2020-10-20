@@ -90,7 +90,7 @@ class PublisherSync(AMQPTransportSync):
             _type = 'text/plain'
             _encoding = 'utf8'
             _payload = data
-        elif isinstance(msg, bytes):
+        elif isinstance(data, bytes):
             _type = 'application/octet-stream'
             _encoding = 'utf8'
             _payload = data
@@ -232,7 +232,13 @@ class SubscriberSync(AMQPTransportSync):
         _dmode = None
         try:
             _ctype = properties.content_type
+        except Exception:
+            _ctype = 'application/json'
+        try:
             _cencoding = properties.content_encoding
+        except Exception:
+            _cencoding = 'utf8'
+        try:
             _dmode = properties.delivery_mode
             _ts_broker = properties.headers['timestamp_in_ms']
             _ts_send = properties.timestamp
