@@ -232,12 +232,18 @@ class SubscriberSync(AMQPTransportSync):
         _dmode = None
         try:
             _ctype = properties.content_type
-        except Exception:
+            _ctype = 'application/json' if _ctype is None else _ctype
+        except Exception as exc:
             _ctype = 'application/json'
+            self.logger.warn('Could not retrieve content_type from headers',
+                             exc_info=True)
         try:
             _cencoding = properties.content_encoding
-        except Exception:
+            _cencoding = 'application/json' if _cencoding is None else _ctype
+        except Exception as exc:
             _cencoding = 'utf8'
+            self.logger.warn('Could not retrieve content_encoding from headers',
+                             exc_info=True)
         try:
             _dmode = properties.delivery_mode
             _ts_broker = properties.headers['timestamp_in_ms']
